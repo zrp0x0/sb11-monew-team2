@@ -1,3 +1,9 @@
 spring:
   application:
     name: P1_Monew
+  profiles:
+    active: dev
+
+logging:
+  level:
+    root: info
