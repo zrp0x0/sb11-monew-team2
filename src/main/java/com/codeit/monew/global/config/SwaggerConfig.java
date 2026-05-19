@@ -1,0 +1,27 @@
+package com.codeit.monew.global.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.servers.Server;
+import java.util.List;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+
+@Configuration
+@Profile({"dev", "local"})
+public class SwaggerConfig {
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Monew API 문서")
+                        .description("Monew API 문서입니다.")
+                        .version("0.0.1")
+                )
+                .servers(List.of(
+                                new Server().url("http://localhost:8080").description("Local Server")
+                        )
+                );
+    }
+}
