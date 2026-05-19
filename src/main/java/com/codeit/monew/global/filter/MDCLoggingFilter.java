@@ -49,6 +49,7 @@ public class MDCLoggingFilter extends OncePerRequestFilter {
         }
     }
 
+    // 클라우드 연결 시 사용할 것
     private String extractClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
 
