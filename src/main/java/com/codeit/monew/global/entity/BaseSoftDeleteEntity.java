@@ -7,7 +7,7 @@ import lombok.Getter;
 
 @MappedSuperclass
 @Getter
-public abstract class BaseSoftDeleteEntity {
+public abstract class BaseSoftDeleteEntity extends BaseTimeEntity {
 
     public static final String IS_DELETED_FALSE = "is_deleted = false";
 
