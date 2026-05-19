@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+
+  <property name="LOG_PATH" value="./.logs"/>
+  <!-- 콘솔용 로그 패턴 (색상 적용) -->
+  <!-- %highlight: 로그 레벨에 따라 색상 자동 변경 (ERROR:빨강, WARN:노랑, INFO:기본 등) -->
+  <!-- %magenta, %cyan, %green 등으로 특정 영역 강조 -->
+  <property name="CONSOLE_LOG_PATTERN"
+    value="%d{yy-MM-dd HH:mm:ss.SSS} %magenta([%thread]) %highlight(%-5level) %cyan(%logger{36}) %green([%X{requestId:-SYSTEM} | IP: %X{clientIp:-LOCAL} | User: %X{userId:-GUEST} | %X{requestMethod:-SYS} %X{requestUrl:-INTERNAL}]) - %msg%n"/>
+
+  <!-- 파일용 로그 패턴 (색상 미적용 - 깨짐 방지) -->
+  <property name="FILE_LOG_PATTERN"
+    value="%d{yy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId:-SYSTEM} | IP: %X{clientIp:-LOCAL} | User: %X{userId:-GUEST} | %X{requestMethod:-SYS} %X{requestUrl:-INTERNAL}] - %msg%n"/>
+
+  <!-- Console Appender -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Rolling File Appender -->
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_PATH}/app.log</file>
+
+    <!-- 일자별 롤링 정책 -->
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <!-- 일자별로 압축 저장: app.2025-01-01.gz 형식 -->
+      <fileNamePattern>${LOG_PATH}/app.%d{yyyy-MM-dd}.gz</fileNamePattern>
+      <!-- 30일간 보관 -->
+      <maxHistory>30</maxHistory>
+    </rollingPolicy>
+
+    <encoder>
+      <pattern>${FILE_LOG_PATTERN}</pattern>
+    </encoder>
+  </appender>
+
+  <!-- application.yml의 logging 설정을 따라감 -->
+
+  <springProfile name="dev | local">
+    <root>
+      <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <!-- 프로젝트 패키지 로그 레벨 제어: 분리하면 나중에 해당 로그만 다른 파일에 찍을 수 있게 변경도 가능함 -->
+    <logger name="com.codeit.monew" additivity="false">
+      <appender-ref ref="CONSOLE"/>
+    </logger>
+  </springProfile>
+
+  <springProfile name="prod">
+    <root>
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="FILE"/>
+    </root>
+    <logger name="com.codeit.monew" additivity="false">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="FILE"/>
+    </logger>
+  </springProfile>
+
+</configuration>
