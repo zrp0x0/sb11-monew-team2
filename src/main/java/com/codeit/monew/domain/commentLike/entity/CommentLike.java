@@ -5,7 +5,7 @@ import jakarta.persistence.Id;
 import java.util.UUID;
 
 @Entity
-public class commentLike {
+public class CommentLike {
 
   @Id
   private UUID id;
