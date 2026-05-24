@@ -16,7 +16,7 @@ import java.util.UUID;
 @Table(name = "subscriptions", indexes = {
         @Index(
                 name = "idx_subscription_interest_user",
-                columnList = "interest_id, user_id,",
+                columnList = "interest_id, user_id",
                 unique = true
         )
 })
@@ -25,7 +25,8 @@ import java.util.UUID;
 @EntityListeners(AuditingEntityListener.class)
 public class Subscription {
 
-  @Id @GeneratedValue(strategy = GenerationType.UUID)
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
   @ManyToOne(fetch = FetchType.LAZY)
