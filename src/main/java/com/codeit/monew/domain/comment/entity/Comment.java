@@ -2,6 +2,7 @@ package com.codeit.monew.domain.comment.entity;
 
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.user.entity.User;
+import com.codeit.monew.global.entity.BaseSoftDeleteEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -22,13 +23,15 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import static com.codeit.monew.global.entity.BaseSoftDeleteEntity.*;
+
 @Entity
 @Table(name = "comments")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
-@SQLRestriction("deleted_at IS NULL")
-public class Comment {
+@SQLRestriction(IS_DELETED_FALSE)
+public class Comment extends BaseSoftDeleteEntity{
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -45,17 +48,6 @@ public class Comment {
   @Column(name = "content", nullable = false, length = 500)
   private String content;
 
-  @CreatedDate
-  @Column(name = "created_at", nullable = false, updatable = false)
-  private LocalDateTime createdAt;
-
-  @LastModifiedDate
-  @Column(name = "updated_at")
-  private LocalDateTime updatedAt;
-
-  @Column(name = "deleted_at")
-  private LocalDateTime deletedAt;
-
   @Column(name = "like_counts", nullable = false, columnDefinition = "INT DEFAULT 0")
   private int likeCounts = 0;
 
@@ -67,10 +59,6 @@ public class Comment {
 
   public static Comment create(Article article, User user, String content) {
     return new Comment(article, user, content);
-  }
-
-  public void delete() {
-    this.deletedAt = LocalDateTime.now();
   }
 
   public void update(String content) {

@@ -1,5 +1,6 @@
 package com.codeit.monew.domain.article.entity;
 
+import com.codeit.monew.global.entity.BaseSoftDeleteEntity;
 import com.codeit.monew.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,6 +16,9 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
+
+import static com.codeit.monew.global.entity.BaseSoftDeleteEntity.*;
 
 @Entity
 @Table(
@@ -25,7 +29,8 @@ import lombok.NoArgsConstructor;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Article extends BaseTimeEntity {
+@SQLRestriction(IS_DELETED_FALSE)
+public class Article extends BaseSoftDeleteEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -53,9 +58,6 @@ public class Article extends BaseTimeEntity {
 
   @Column(name = "comment_count", nullable = false)
   private long commentCount = 0L;
-
-  @Column(name = "deleted_at")
-  private LocalDateTime deletedAt;
 
   private Article(
           ArticleSource source,
