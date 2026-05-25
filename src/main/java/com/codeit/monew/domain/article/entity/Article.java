@@ -1,20 +1,16 @@
 package com.codeit.monew.domain.article.entity;
 
-import com.codeit.monew.global.entity.BaseTimeEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDateTime;
-import java.util.UUID;
+import com.codeit.monew.global.entity.BaseSoftDeleteEntity;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+import static com.codeit.monew.global.entity.BaseSoftDeleteEntity.IS_DELETED_FALSE;
 
 @Entity
 @Table(
@@ -25,11 +21,11 @@ import lombok.NoArgsConstructor;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Article extends BaseTimeEntity {
+@SQLRestriction(IS_DELETED_FALSE)
+public class Article extends BaseSoftDeleteEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
-  @Column(columnDefinition = "uuid", nullable = false, updatable = false)
   private UUID id;
 
   @Enumerated(EnumType.STRING)
@@ -53,9 +49,6 @@ public class Article extends BaseTimeEntity {
 
   @Column(name = "comment_count", nullable = false)
   private long commentCount = 0L;
-
-  @Column(name = "deleted_at")
-  private LocalDateTime deletedAt;
 
   private Article(
           ArticleSource source,
