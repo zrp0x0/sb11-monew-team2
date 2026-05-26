@@ -13,8 +13,10 @@ import static org.mockito.Mockito.never;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
 import com.codeit.monew.domain.comment.dto.CommentDto;
+import com.codeit.monew.domain.comment.dto.CommentOrderBy;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
 import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
+import com.codeit.monew.domain.comment.dto.SortDirection;
 import com.codeit.monew.domain.comment.entity.Comment;
 import com.codeit.monew.domain.comment.exception.CommentException;
 import com.codeit.monew.domain.comment.repository.CommentRepository;
@@ -121,7 +123,7 @@ public class CommentServiceTest {
     @Test
     @DisplayName("cursor 없이 첫 페이지 조회 시 CursorPageResponseCommentDto를 반환")
     void getComments_FirstPage_ReturnsCursorPageResponse() {
-      int size = 2;
+      int limit = 2;
       given(user.getNickname()).willReturn("tester");
       given(user.getId()).willReturn(UUID.randomUUID());
       given(article.getId()).willReturn(articleId);
@@ -132,20 +134,21 @@ public class CommentServiceTest {
       );
 
       given(commentRepository.countByArticleId(articleId)).willReturn(2L);
-      given(commentRepository.findByArticleIdFirstPage(articleId, size + 1)).willReturn(comments);
+      given(commentRepository.findByArticleIdFirstPageCreatedAtDesc(articleId, limit + 1)).willReturn(comments);
 
-      CursorPageResponseCommentDto result = commentService.getComments(articleId, null, null, size);
+      CursorPageResponseCommentDto result = commentService.getComments(articleId, null, null, limit,
+          CommentOrderBy.createdAt, SortDirection.DESC, UUID.randomUUID());
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
       assertThat(result.totalElements()).isEqualTo(2L);
-      then(commentRepository).should().findByArticleIdFirstPage(articleId, size + 1);
+      then(commentRepository).should().findByArticleIdFirstPageCreatedAtDesc(articleId, limit + 1);
     }
 
     @Test
     @DisplayName("size + 1개가 조회되면 hasNext가 true이고 content는 size개만 반환")
     void getComments_HasNext_ReturnsOnlySizeItems() {
-      int size = 2;
+      int limit = 2;
 
       Comment comment1 = mock(Comment.class);
       Comment comment2 = mock(Comment.class);
@@ -170,12 +173,13 @@ public class CommentServiceTest {
       List<Comment> comments = List.of(comment1, comment2, comment3);
 
       given(commentRepository.countByArticleId(articleId)).willReturn(3L);
-      given(commentRepository.findByArticleIdFirstPage(articleId, size + 1))
+      given(commentRepository.findByArticleIdFirstPageCreatedAtDesc(articleId, limit + 1))
           .willReturn(comments);
 
-      CursorPageResponseCommentDto result = commentService.getComments(articleId, null, null, size);
+      CursorPageResponseCommentDto result = commentService.getComments(
+          articleId, null, null, limit, CommentOrderBy.createdAt, SortDirection.DESC, UUID.randomUUID());
 
-      assertThat(result.content()).hasSize(size);
+      assertThat(result.content()).hasSize(limit);
       assertThat(result.hasNext()).isTrue();
       assertThat(result.nextCursor()).isNotNull();
       assertThat(result.nextAfter()).isNotNull();
@@ -184,7 +188,7 @@ public class CommentServiceTest {
     @Test
     @DisplayName("cursor와 after가 있으면 커서 기반 다음 페이지를 조회")
     void getComments_WithCursor_ReturnsNextPage() {
-      int size = 2;
+      int limit = 2;
       String cursor = UUID.randomUUID().toString();
       LocalDateTime after = LocalDateTime.now();
 
@@ -206,15 +210,16 @@ public class CommentServiceTest {
       List<Comment> comments = List.of(comment1, comment2);
 
       given(commentRepository.countByArticleId(articleId)).willReturn(4L);
-      given(commentRepository.findByArticleIdAfterCursor(
-          eq(articleId), eq(after), any(UUID.class), eq(size + 1)))
+      given(commentRepository.findByArticleIdAfterCursorCreatedAtDesc(
+          eq(articleId), eq(after), any(UUID.class), eq(limit + 1)))
           .willReturn(comments);
 
-      CursorPageResponseCommentDto result = commentService.getComments(articleId, cursor, after, size);
+      CursorPageResponseCommentDto result = commentService.getComments(
+          articleId, cursor, after, limit, CommentOrderBy.createdAt, SortDirection.DESC, UUID.randomUUID());
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
-      then(commentRepository).should().findByArticleIdAfterCursor(eq(articleId), eq(after), any(UUID.class), eq(size + 1));
+      then(commentRepository).should().findByArticleIdAfterCursorCreatedAtDesc(eq(articleId), eq(after), any(UUID.class), eq(limit + 1));
     }
 
     @Test
@@ -223,12 +228,13 @@ public class CommentServiceTest {
       String cursor = UUID.randomUUID().toString();
 
       assertThatThrownBy(() ->
-          commentService.getComments(articleId, cursor, null, 10))
+          commentService.getComments(articleId, cursor, null, 10,
+              CommentOrderBy.createdAt, SortDirection.DESC, UUID.randomUUID()))
           .isInstanceOf(CommentException.class);
 
-      then(commentRepository).should(never()).findByArticleIdFirstPage(any(), anyInt());
+      then(commentRepository).should(never()).findByArticleIdFirstPageCreatedAtDesc(any(), anyInt());
       then(commentRepository).should(never())
-          .findByArticleIdAfterCursor(any(), any(), any(), anyInt());
+          .findByArticleIdAfterCursorCreatedAtDesc(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -237,7 +243,8 @@ public class CommentServiceTest {
       LocalDateTime after = LocalDateTime.now();
 
       assertThatThrownBy(() ->
-          commentService.getComments(articleId, null, after, 10))
+          commentService.getComments(articleId, null, after, 10,
+              CommentOrderBy.createdAt, SortDirection.DESC, UUID.randomUUID()))
           .isInstanceOf(CommentException.class);
     }
 
@@ -248,8 +255,73 @@ public class CommentServiceTest {
       LocalDateTime after = LocalDateTime.now();
 
       assertThatThrownBy(() ->
-          commentService.getComments(articleId, invalidCursor, after, 10))
+          commentService.getComments(articleId, invalidCursor, after, 10,
+              CommentOrderBy.createdAt, SortDirection.DESC, UUID.randomUUID()))
           .isInstanceOf(CommentException.class);
+    }
+
+    @Test
+    @DisplayName("likeCount 정렬 시 첫 페이지를 조회")
+    void getComments_likeCountFirstPage_ReturnsCursorPageResponse() {
+      int limit = 2;
+      given(user.getNickname()).willReturn("tester");
+      given(user.getId()).willReturn(UUID.randomUUID());
+      given(article.getId()).willReturn(articleId);
+
+      List<Comment> comments = List.of(
+          Comment.create(article, user, "testComment1"),
+          Comment.create(article, user, "testComment2")
+      );
+
+      given(commentRepository.countByArticleId(articleId)).willReturn(2L);
+      given(commentRepository.findByArticleIdFirstPageLikeCountDesc(articleId, limit + 1))
+          .willReturn(comments);
+
+      CursorPageResponseCommentDto result = commentService.getComments(
+          articleId, null, null, limit, CommentOrderBy.likeCount, SortDirection.DESC, UUID.randomUUID());
+
+      assertThat(result.content()).hasSize(2);
+      assertThat(result.hasNext()).isFalse();
+      then(commentRepository).should()
+          .findByArticleIdFirstPageLikeCountDesc(articleId, limit + 1);
+    }
+
+    @Test
+    @DisplayName("likeCount 정렬 시 cursor와 after가 있으면 다음 페이지를 조회한다")
+    void getComments_LikeCountWithCursor_ReturnsNextPage() {
+      int limit = 2;
+      String cursor = "10";
+      LocalDateTime after = LocalDateTime.now();
+
+      Comment comment1 = mock(Comment.class);
+      Comment comment2 = mock(Comment.class);
+
+      given(comment1.getId()).willReturn(UUID.randomUUID());
+      given(comment2.getId()).willReturn(UUID.randomUUID());
+      given(comment1.getUser()).willReturn(user);
+      given(comment2.getUser()).willReturn(user);
+      given(comment1.getArticle()).willReturn(article);
+      given(comment2.getArticle()).willReturn(article);
+      given(comment1.getCreatedAt()).willReturn(LocalDateTime.now());
+      given(comment2.getCreatedAt()).willReturn(LocalDateTime.now());
+      given(user.getNickname()).willReturn("tester");
+      given(user.getId()).willReturn(UUID.randomUUID());
+      given(article.getId()).willReturn(articleId);
+
+      List<Comment> comments = List.of(comment1, comment2);
+
+      given(commentRepository.countByArticleId(articleId)).willReturn(4L);
+      given(commentRepository.findByArticleIdAfterCursorLikeCountDesc(
+          eq(articleId), anyInt(), any(UUID.class), eq(limit + 1)))
+          .willReturn(comments);
+
+      CursorPageResponseCommentDto result = commentService.getComments(
+          articleId, cursor, after, limit, CommentOrderBy.likeCount, SortDirection.DESC, UUID.randomUUID());
+
+      assertThat(result.content()).hasSize(2);
+      assertThat(result.hasNext()).isFalse();
+      then(commentRepository).should()
+          .findByArticleIdAfterCursorLikeCountDesc(eq(articleId), anyInt(), any(UUID.class), eq(limit + 1));
     }
   }
 }

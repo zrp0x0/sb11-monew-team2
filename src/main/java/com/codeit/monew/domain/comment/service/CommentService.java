@@ -3,8 +3,10 @@ package com.codeit.monew.domain.comment.service;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
 import com.codeit.monew.domain.comment.dto.CommentDto;
+import com.codeit.monew.domain.comment.dto.CommentOrderBy;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
 import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
+import com.codeit.monew.domain.comment.dto.SortDirection;
 import com.codeit.monew.domain.comment.entity.Comment;
 import com.codeit.monew.domain.comment.exception.CommentErrorCode;
 import com.codeit.monew.domain.comment.exception.CommentException;
@@ -51,38 +53,60 @@ public class CommentService {
       UUID articleId,
       String cursor,
       LocalDateTime after,
-      int size
+      int limit,
+      CommentOrderBy orderBy,
+      SortDirection direction,
+      UUID requestUserId
   ) {
-    log.info("댓글 목록 조회. ArticleId: {}, cursor: {}, after: {}, size: {}",
-        articleId, cursor, after, size);
+    log.info("댓글 목록 조회. ArticleId: {}, cursor: {}, after: {}, limit: {}, orderBy: {}, direction: {}",
+        articleId, cursor, after, limit, orderBy, direction);
 
     if((cursor == null) != (after == null)) {
       throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
     }
 
     if(cursor != null) {
-      try {
-        UUID.fromString(cursor);
-      } catch (IllegalArgumentException e) {
-        throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
+      if (orderBy == CommentOrderBy.likeCount) {
+        try {
+          Integer.parseInt(cursor);
+        } catch (NumberFormatException e) {
+          throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
+        }
+      } else {
+        try {
+          UUID.fromString(cursor);
+        } catch (IllegalArgumentException e) {
+          throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
+        }
       }
     }
 
-    int limit = size + 1;
+    int queryLimit = limit + 1;
 
     // TODO: 댓글이 많아질 경우 COUNT 쿼리 성능 저하 가능성이 있음
     long totalElements = commentRepository.countByArticleId(articleId);
 
-    List<Comment> comments = (cursor == null || after == null)
-        ? commentRepository.findByArticleIdFirstPage(articleId, limit)
-        : commentRepository.findByArticleIdAfterCursor(
-            articleId, after, UUID.fromString(cursor), limit
-        );
+    List<Comment> comments;
+    if (cursor == null) {
+      comments = orderBy == CommentOrderBy.likeCount
+          ? commentRepository.findByArticleIdFirstPageLikeCountDesc(articleId, queryLimit)
+          : commentRepository.findByArticleIdFirstPageCreatedAtDesc(articleId, queryLimit);
+    } else {
+      UUID cursorId = orderBy == CommentOrderBy.likeCount
+          ? null
+          : UUID.fromString(cursor);
+
+      comments = orderBy == CommentOrderBy.likeCount
+          ? commentRepository.findByArticleIdAfterCursorLikeCountDesc(
+              articleId, Integer.parseInt(cursor), UUID.randomUUID(), queryLimit)
+          : commentRepository.findByArticleIdAfterCursorCreatedAtDesc(
+              articleId, after, cursorId, queryLimit);
+    }
 
     List<CommentDto> dtos = comments.stream()
         .map(c -> CommentDto.of(c, c.getUser().getNickname(), false))
         .toList();
 
-    return CursorPageResponseCommentDto.of(dtos, size, totalElements);
+    return CursorPageResponseCommentDto.of(dtos, limit, totalElements, orderBy);
   }
 }
