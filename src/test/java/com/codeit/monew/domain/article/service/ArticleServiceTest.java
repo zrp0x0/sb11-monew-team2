@@ -21,7 +21,7 @@ class ArticleServiceTest {
                 "NAVER",
                 "HANKYUNG",
                 "CHOSUN",
-                "YONHAP"
+                "YEONHAP"
         );
     }
 }
