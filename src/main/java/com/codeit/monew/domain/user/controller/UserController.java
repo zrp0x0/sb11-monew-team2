@@ -1,5 +1,6 @@
 package com.codeit.monew.domain.user.controller;
 
+import com.codeit.monew.domain.user.dto.request.UserLoginRequest;
 import com.codeit.monew.domain.user.dto.request.UserRegisterRequest;
 import com.codeit.monew.domain.user.dto.response.UserDto;
 import com.codeit.monew.domain.user.service.UserService;
@@ -28,5 +29,12 @@ public class UserController {
     public UserDto registerUser(@Valid @RequestBody UserRegisterRequest request) {
         log.info("회원가입 요청 시작");
         return userService.register(request);
+    }
+
+    @Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인합니다.")
+    @PostMapping("/login")
+    public UserDto login(@Valid @RequestBody UserLoginRequest request) {
+        log.info("로그인 요청 시작");
+        return userService.login(request);
     }
 }
