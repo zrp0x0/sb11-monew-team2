@@ -12,7 +12,17 @@ public record InterestResponse(
     boolean subscribedByMe
 ) {
 
-  public static InterestResponse from(Interest interest, boolean subscribedByMe) {
+  // TODO: 요청자 ID가 들어오지 않을 시 -> subscribedByMe = false로 지정
+  public static InterestResponse from(Interest interest) {
+    return new InterestResponse(
+        interest.getId(),
+        interest.getName(),
+        interest.getKeywords(),
+        interest.getSubscriberCount(),
+        false);
+  }
+
+  public static InterestResponse of(Interest interest, boolean subscribedByMe) {
     return new InterestResponse(
         interest.getId(),
         interest.getName(),
