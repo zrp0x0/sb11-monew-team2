@@ -1,6 +1,8 @@
 package com.codeit.monew.domain.subscription.service;
 
 import com.codeit.monew.domain.interest.entity.Interest;
+import com.codeit.monew.domain.interest.exception.InterestErrorCode;
+import com.codeit.monew.domain.interest.exception.InterestException;
 import com.codeit.monew.domain.interest.repository.InterestRepository;
 import com.codeit.monew.domain.subscription.dto.response.SubscriptionDto;
 import com.codeit.monew.domain.subscription.entity.Subscription;
@@ -38,9 +40,9 @@ public class SubscriptionService {
         }
 
         // 새로운 구독 생성
-        // TODO: 관심사 / 사용자 예외 생성 후 적용
+        // TODO: 사용자 예외 생성 후 적용
         Interest foundInterest = interestRepository.findById(interestId)
-            .orElseThrow(() -> new RuntimeException("구독 정보 없음"));
+            .orElseThrow(() -> new InterestException(InterestErrorCode.INTEREST_NOT_FOUND));
         User foundUser = userRepository.findById(requestUserId)
             .orElseThrow(() -> new RuntimeException("사용자 정보 없음"));
 
@@ -53,5 +55,34 @@ public class SubscriptionService {
 
         log.info("관심사 구독 완료. SubscriptionId: {}", savedSubscription.getId());
         return SubscriptionDto.from(savedSubscription);
+    }
+
+    /**
+     * 관심사 구독 취소
+     */
+    @Transactional
+    public void cancelSubscription(UUID interestId, UUID requestUserId) {
+        // 구독 중인지 확인
+        Optional<Subscription> foundSubscription =
+            subscriptionRepository.findByInterestIdAndUserIdWithInterest(interestId, requestUserId);
+
+        // TODO: 구독 중이지 않으면 그냥 종료 (취소 성공 응답은 보내는 문제 발생)
+        // - 구독하지 않은 경우 구독 취소 요청을 보내서 아무 행동 없이 return 해도 구독 취소 성공(OK)를 내보는내야할까?
+        if (foundSubscription.isEmpty()) {
+            return;
+        }
+
+        // 구독 취소
+        subscriptionRepository.delete(foundSubscription.get());
+
+        // 구독자 수 감소
+        // TODO: 동시성 문제 발생할 수도 있음 (현재는 고려 X)
+        Interest foundInterest = foundSubscription.get().getInterest();
+        // - findByInterestIdAndUserIdWithInterest로 해당 구독에 대한 관심사를 영속성 컨텍스트로 미리 올려놓아서
+        // - 추가적인 select 쿼리를 발생하지 않게 최적화
+        // - 단, 1+1 문제로 큰 영향을 주지 않을 것으로 예상됨 (+ join 비용 vs select 1번 추가 비용)
+        foundInterest.decreaseSubscriberCount();
+
+        log.info("관심사 구독 취소 완료. SubscriptionId: {}", foundSubscription.get().getId());
     }
 }
