@@ -10,30 +10,61 @@ import org.springframework.data.repository.query.Param;
 
 public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
+  // 등록 순 정렬
   @Query("""
       SELECT c FROM Comment c
       JOIN FETCH c.user
       WHERE c.article.id = :articleId
-      ORDER BY c.createdAt DESC, c.id DESC 
+      ORDER BY c.createdAt DESC, c.id DESC
       LIMIT :limit
       """)
-  List<Comment> findByArticleIdFirstPage (@Param("articleId") UUID articleId, @Param("limit") int limit);
+  List<Comment> findByArticleIdFirstPageCreatedAtDesc (@Param("articleId") UUID articleId, @Param("limit") int limit);
 
   @Query("""
       SELECT c FROM Comment c
       JOIN FETCH c.user
       WHERE c.article.id = :articleId
         AND (c.createdAt < :after
-          OR (c.createdAt = : after AND c.id < :cusorId))
-      ORDER BY c.createdAt DESC, c.id DESC 
+          OR (c.createdAt = :after AND c.id < :cursorId))
+      ORDER BY c.createdAt DESC, c.id DESC
       LIMIT :limit
       """)
-  List<Comment> findByArticleIdAfterCursor (
+  List<Comment> findByArticleIdAfterCursorCreatedAtDesc (
       @Param("articleId") UUID articleId,
       @Param("after")LocalDateTime after,
       @Param("cursorId") UUID cursorId,
       @Param("limit") int limit
   );
+
+  // 좋아요 순 정렬
+  @Query("""
+      SELECT c FROM Comment c
+      JOIN FETCH c.user
+      WHERE c.article.id = :articleId
+      ORDER BY c.likeCounts DESC, c.id DESC
+      LIMIT :limit
+      """)
+  List<Comment> findByArticleIdFirstPageLikeCountDesc(
+      @Param("articleId") UUID articleId,
+      @Param("limit") int limit
+  );
+
+  @Query("""
+      SELECT c FROM Comment c
+      JOIN FETCH c.user
+      WHERE c.article.id = :articleId
+        AND (c.likeCounts < :likeCount
+          OR (c.likeCounts = :likeCount AND c.id < :cursorId))
+      ORDER BY c.likeCounts DESC, c.id DESC
+      LIMIT :limit
+      """)
+  List<Comment> findByArticleIdAfterCursorLikeCountDesc(
+      @Param("articleId") UUID articleId,
+      @Param("likeCount") int likeCount,
+      @Param("cursorId") UUID cursorId,
+      @Param("limit") int limit
+  );
+
 
   long countByArticleId(UUID articleId);
 }
