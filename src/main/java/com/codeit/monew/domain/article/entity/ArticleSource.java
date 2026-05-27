@@ -5,5 +5,5 @@ public enum ArticleSource {
     NAVER,
     HANKYUNG,
     CHOSUN,
-    YONHAP
+    YEONHAP
 }

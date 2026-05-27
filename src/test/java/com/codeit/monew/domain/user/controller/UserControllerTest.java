@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.codeit.monew.domain.user.dto.request.UserLoginRequest;
 import com.codeit.monew.domain.user.dto.request.UserRegisterRequest;
 import com.codeit.monew.domain.user.dto.response.UserDto;
 import com.codeit.monew.domain.user.exception.UserErrorCode;
@@ -113,6 +114,75 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
 
+    @Test
+    @DisplayName("로그인 성공 시 200 OK와 UserDto를 반환")
+    void login_success() throws Exception {
+        // given
+        UUID id = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        LocalDateTime createdAt = LocalDateTime.of(2026, 5, 26, 12, 0);
+        UserDto response = new UserDto(id, "user@example.com", "User", createdAt);
+        Map<String, String> request = Map.of(
+                "email", "user@example.com",
+                "password", "password"
+        );
+
+        when(userService.login(any(UserLoginRequest.class))).thenReturn(response);
+
+        // when & then
+        mockMvc.perform(post("/api/users/login")
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.nickname").value("User"))
+                .andExpect(jsonPath("$.createdAt").value("2026-05-26T12:00:00"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidLoginRequests")
+    @DisplayName("로그인 입력값이 유효하지 않으면 400 Bad Request를 반환")
+    void login_fail_whenRequestInvalid(String description, Map<String, String> request, String invalidField)
+            throws Exception {
+        // when & then
+        mockMvc.perform(post("/api/users/login")
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.details." + invalidField).exists());
+    }
+
+    @Test
+    @DisplayName("로그인 인증 실패 시 401 Unauthorized를 반환")
+    void login_fail_whenCredentialsInvalid() throws Exception {
+        // given
+        Map<String, String> request = Map.of(
+                "email", "user@example.com",
+                "password", "password"
+        );
+
+        when(userService.login(any(UserLoginRequest.class)))
+                .thenThrow(new UserException(UserErrorCode.INVALID_CREDENTIALS));
+
+        // when & then
+        mockMvc.perform(post("/api/users/login")
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
+                .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 올바르지 않습니다."))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+    }
+
     private static Stream<Arguments> invalidRegisterRequests() {
         return Stream.of(
                 Arguments.of("이메일 공백", registerRequest("", "User", "password"), "email"),
@@ -124,10 +194,25 @@ class UserControllerTest {
         );
     }
 
+    private static Stream<Arguments> invalidLoginRequests() {
+        return Stream.of(
+                Arguments.of("이메일 공백", loginRequest("", "password"), "email"),
+                Arguments.of("이메일 형식 오류", loginRequest("not-email", "password"), "email"),
+                Arguments.of("비밀번호 공백", loginRequest("user@example.com", ""), "password")
+        );
+    }
+
     private static Map<String, String> registerRequest(String email, String nickname, String password) {
         return Map.of(
                 "email", email,
                 "nickname", nickname,
+                "password", password
+        );
+    }
+
+    private static Map<String, String> loginRequest(String email, String password) {
+        return Map.of(
+                "email", email,
                 "password", password
         );
     }

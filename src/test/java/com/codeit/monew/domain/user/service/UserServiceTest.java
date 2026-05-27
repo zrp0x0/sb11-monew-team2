@@ -8,12 +8,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.codeit.monew.domain.user.dto.request.UserLoginRequest;
 import com.codeit.monew.domain.user.dto.request.UserRegisterRequest;
 import com.codeit.monew.domain.user.dto.response.UserDto;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.exception.UserErrorCode;
 import com.codeit.monew.domain.user.exception.UserException;
 import com.codeit.monew.domain.user.repository.UserRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -108,5 +110,83 @@ class UserServiceTest {
                 .isInstanceOf(UserException.class)
                 .extracting("errorCode")
                 .isEqualTo(UserErrorCode.EMAIL_DUPLICATION);
+    }
+
+    @Test
+    @DisplayName("올바른 이메일과 비밀번호로 로그인하면 UserDto를 반환")
+    void login_success() {
+        // given
+        String email = "test@email.com";
+        String password = "testPassword";
+        String encodedPassword = "$2y$04$CnmQ.L0MoRdQxDev/JnKaOKKDqae5Ja40NMIgep0h7xRbX6jhRzZm";
+        UserLoginRequest request = new UserLoginRequest(email, password);
+        User user = User.create(email, "testNickname", encodedPassword);
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(password, encodedPassword)).thenReturn(true);
+
+        // when
+        UserDto response = userService.login(request);
+
+        // then
+        assertThat(response.email()).isEqualTo(email);
+        assertThat(response.nickname()).isEqualTo("testNickname");
+        verify(passwordEncoder).matches(password, encodedPassword);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 이메일이면 로그인에 실패")
+    void login_fail_whenEmailNotFound() {
+        // given
+        String email = "unknown@email.com";
+        UserLoginRequest request = new UserLoginRequest(email, "testPassword");
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> userService.login(request))
+                .isInstanceOf(UserException.class)
+                .extracting("errorCode")
+                .isEqualTo(UserErrorCode.INVALID_CREDENTIALS);
+
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("비밀번호가 일치하지 않으면 로그인에 실패")
+    void login_fail_whenPasswordMismatched() {
+        // given
+        String email = "test@email.com";
+        String password = "wrongPassword";
+        String encodedPassword = "$2y$04$CnmQ.L0MoRdQxDev/JnKaOKKDqae5Ja40NMIgep0h7xRbX6jhRzZm";
+        UserLoginRequest request = new UserLoginRequest(email, password);
+        User user = User.create(email, "testNickname", encodedPassword);
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(password, encodedPassword)).thenReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> userService.login(request))
+                .isInstanceOf(UserException.class)
+                .extracting("errorCode")
+                .isEqualTo(UserErrorCode.INVALID_CREDENTIALS);
+    }
+
+    @Test
+    @DisplayName("논리삭제 사용자는 조회되지 않는 사용자와 동일하게 로그인에 실패")
+    void login_fail_whenSoftDeletedUserExcluded() {
+        // given
+        String email = "deleted@email.com";
+        UserLoginRequest request = new UserLoginRequest(email, "testPassword");
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> userService.login(request))
+                .isInstanceOf(UserException.class)
+                .extracting("errorCode")
+                .isEqualTo(UserErrorCode.INVALID_CREDENTIALS);
+
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
     }
 }
