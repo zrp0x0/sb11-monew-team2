@@ -104,6 +104,7 @@ public class CommentService {
     return CursorPageResponseCommentDto.of(dtos, limit, totalElements, orderBy);
   }
 
+  @Transactional
   public CommentDto updateComment(UUID commentId, UUID userId, CommentUpdateRequest request) {
     Comment comment = commentRepository.findById(commentId)
         .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
