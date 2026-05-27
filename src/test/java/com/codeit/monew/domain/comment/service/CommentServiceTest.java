@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -134,7 +135,7 @@ public class CommentServiceTest {
       );
 
       given(commentRepository.countByArticleId(articleId)).willReturn(2L);
-      given(commentRepository.findByArticleIdFirstPageCreatedAtDesc(articleId, limit + 1)).willReturn(comments);
+      given(commentRepository.findComments(articleId, CommentOrderBy.createdAt, null, null, null, limit + 1)).willReturn(comments);
 
       CursorPageResponseCommentDto result = commentService.getComments(articleId, null, null, limit,
           CommentOrderBy.createdAt, SortDirection.DESC, UUID.randomUUID());
@@ -142,7 +143,7 @@ public class CommentServiceTest {
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
       assertThat(result.totalElements()).isEqualTo(2L);
-      then(commentRepository).should().findByArticleIdFirstPageCreatedAtDesc(articleId, limit + 1);
+      then(commentRepository).should().findComments(articleId, CommentOrderBy.createdAt, null, null, null, limit + 1);
     }
 
     @Test
@@ -173,7 +174,7 @@ public class CommentServiceTest {
       List<Comment> comments = List.of(comment1, comment2, comment3);
 
       given(commentRepository.countByArticleId(articleId)).willReturn(3L);
-      given(commentRepository.findByArticleIdFirstPageCreatedAtDesc(articleId, limit + 1))
+      given(commentRepository.findComments(articleId, CommentOrderBy.createdAt, null, null, null, limit + 1))
           .willReturn(comments);
 
       CursorPageResponseCommentDto result = commentService.getComments(
@@ -210,8 +211,8 @@ public class CommentServiceTest {
       List<Comment> comments = List.of(comment1, comment2);
 
       given(commentRepository.countByArticleId(articleId)).willReturn(4L);
-      given(commentRepository.findByArticleIdAfterCursorCreatedAtDesc(
-          eq(articleId), eq(after), any(UUID.class), eq(limit + 1)))
+      given(commentRepository.findComments(
+          eq(articleId), eq(CommentOrderBy.createdAt), eq(after), any(UUID.class), isNull(), eq(limit + 1)))
           .willReturn(comments);
 
       CursorPageResponseCommentDto result = commentService.getComments(
@@ -219,7 +220,7 @@ public class CommentServiceTest {
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
-      then(commentRepository).should().findByArticleIdAfterCursorCreatedAtDesc(eq(articleId), eq(after), any(UUID.class), eq(limit + 1));
+      then(commentRepository).should().findComments(eq(articleId), eq(CommentOrderBy.createdAt), eq(after), any(UUID.class), isNull(), eq(limit + 1));
     }
 
     @Test
@@ -232,9 +233,7 @@ public class CommentServiceTest {
               CommentOrderBy.createdAt, SortDirection.DESC, UUID.randomUUID()))
           .isInstanceOf(CommentException.class);
 
-      then(commentRepository).should(never()).findByArticleIdFirstPageCreatedAtDesc(any(), anyInt());
-      then(commentRepository).should(never())
-          .findByArticleIdAfterCursorCreatedAtDesc(any(), any(), any(), anyInt());
+      then(commentRepository).should(never()).findComments(any(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -274,7 +273,7 @@ public class CommentServiceTest {
       );
 
       given(commentRepository.countByArticleId(articleId)).willReturn(2L);
-      given(commentRepository.findByArticleIdFirstPageLikeCountDesc(articleId, limit + 1))
+      given(commentRepository.findComments(articleId, CommentOrderBy.likeCount, null, null, null, limit + 1))
           .willReturn(comments);
 
       CursorPageResponseCommentDto result = commentService.getComments(
@@ -283,7 +282,7 @@ public class CommentServiceTest {
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
       then(commentRepository).should()
-          .findByArticleIdFirstPageLikeCountDesc(articleId, limit + 1);
+          .findComments(articleId, CommentOrderBy.likeCount, null, null, null, limit + 1);
     }
 
     @Test
@@ -311,8 +310,8 @@ public class CommentServiceTest {
       List<Comment> comments = List.of(comment1, comment2);
 
       given(commentRepository.countByArticleId(articleId)).willReturn(4L);
-      given(commentRepository.findByArticleIdAfterCursorLikeCountDesc(
-          eq(articleId), anyInt(), any(LocalDateTime.class), eq(limit + 1)))
+      given(commentRepository.findComments(
+          eq(articleId), eq(CommentOrderBy.likeCount), any(LocalDateTime.class), isNull(), eq(10), eq(limit + 1)))
           .willReturn(comments);
 
       CursorPageResponseCommentDto result = commentService.getComments(
@@ -321,7 +320,7 @@ public class CommentServiceTest {
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
       then(commentRepository).should()
-          .findByArticleIdAfterCursorLikeCountDesc(eq(articleId), anyInt(), any(LocalDateTime.class), eq(limit + 1));
+          .findComments(eq(articleId), eq(CommentOrderBy.likeCount), any(LocalDateTime.class), isNull(), eq(10), eq(limit + 1));
     }
   }
 }
