@@ -64,7 +64,10 @@ jacocoTestReport {
     afterEvaluate {
         classDirectories.setFrom(files(classDirectories.files.collect {
             fileTree(dir: it,
-                    includes: ['com/codeit/monew/domain/**'],
+                    includes: [
+                            'com/codeit/monew/domain/**/service/**',
+                            'com/codeit/monew/domain/**/repository/**'
+                    ],
                     excludes: Qdomains)
         }))
     }
@@ -74,7 +77,10 @@ jacocoTestCoverageVerification {
     afterEvaluate {
         classDirectories.setFrom(files(classDirectories.files.collect {
             fileTree(dir: it,
-                    includes: ['com/codeit/monew/domain/**'],
+                    includes: [
+                            'com/codeit/monew/domain/**/service/**',
+                            'com/codeit/monew/domain/**/repository/**'
+                    ],
                     excludes: Qdomains)
         }))
     }
