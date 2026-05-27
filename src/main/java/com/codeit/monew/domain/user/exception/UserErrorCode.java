@@ -9,7 +9,8 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum UserErrorCode implements ErrorCode {
 
-    EMAIL_DUPLICATION(HttpStatus.CONFLICT, "EMAIL_DUPLICATION", "이미 존재하는 이메일입니다.");
+    EMAIL_DUPLICATION(HttpStatus.CONFLICT, "EMAIL_DUPLICATION", "이미 존재하는 이메일입니다."),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
