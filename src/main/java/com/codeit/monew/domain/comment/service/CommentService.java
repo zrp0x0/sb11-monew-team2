@@ -87,24 +87,17 @@ public class CommentService {
     // TODO: 댓글이 많아질 경우 COUNT 쿼리 성능 저하 가능성이 있음
     long totalElements = commentRepository.countByArticleId(articleId);
 
-    List<Comment> comments;
-    if (cursor == null) {
-      comments = orderBy == CommentOrderBy.likeCount
-          ? commentRepository.findByArticleIdFirstPageLikeCountDesc(articleId, queryLimit)
-          : commentRepository.findByArticleIdFirstPageCreatedAtDesc(articleId, queryLimit);
-    } else {
-      UUID cursorId = orderBy == CommentOrderBy.likeCount
-          ? null
-          : UUID.fromString(cursor);
+    UUID cursorId = (cursor != null && orderBy == CommentOrderBy.createdAt)
+        ? UUID.fromString(cursor) : null;
+    Integer cursorLikeCount = (cursor != null && orderBy == CommentOrderBy.likeCount)
+        ? Integer.parseInt(cursor) : null;
 
-      comments = orderBy == CommentOrderBy.likeCount
-          ? commentRepository.findByArticleIdAfterCursorLikeCountDesc(
-              articleId, Integer.parseInt(cursor), after, queryLimit)
-          : commentRepository.findByArticleIdAfterCursorCreatedAtDesc(
-              articleId, after, cursorId, queryLimit);
-    }
+    List<Comment> comments = commentRepository.findComments(
+        articleId, orderBy, after, cursorId, cursorLikeCount, queryLimit
+    );
 
     List<CommentDto> dtos = comments.stream()
+        // TODO: CommentLike 구현 후 requestUserId 기반으로 likedByMe 여부 조회로 교체
         .map(c -> CommentDto.of(c, c.getUser().getNickname(), false))
         .toList();
 
