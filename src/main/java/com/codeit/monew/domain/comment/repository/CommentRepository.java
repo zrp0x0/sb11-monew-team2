@@ -54,14 +54,14 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
       JOIN FETCH c.user
       WHERE c.article.id = :articleId
         AND (c.likeCounts < :likeCount
-          OR (c.likeCounts = :likeCount AND c.id < :cursorId))
+          OR (c.likeCounts = :likeCount AND c.createdAt < :after))
       ORDER BY c.likeCounts DESC, c.id DESC
       LIMIT :limit
       """)
   List<Comment> findByArticleIdAfterCursorLikeCountDesc(
       @Param("articleId") UUID articleId,
       @Param("likeCount") int likeCount,
-      @Param("cursorId") UUID cursorId,
+      @Param("after") LocalDateTime after,
       @Param("limit") int limit
   );
 

@@ -98,7 +98,7 @@ public class CommentService {
 
       comments = orderBy == CommentOrderBy.likeCount
           ? commentRepository.findByArticleIdAfterCursorLikeCountDesc(
-              articleId, Integer.parseInt(cursor), UUID.randomUUID(), queryLimit)
+              articleId, Integer.parseInt(cursor), after, queryLimit)
           : commentRepository.findByArticleIdAfterCursorCreatedAtDesc(
               articleId, after, cursorId, queryLimit);
     }

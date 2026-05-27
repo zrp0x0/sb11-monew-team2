@@ -312,7 +312,7 @@ public class CommentServiceTest {
 
       given(commentRepository.countByArticleId(articleId)).willReturn(4L);
       given(commentRepository.findByArticleIdAfterCursorLikeCountDesc(
-          eq(articleId), anyInt(), any(UUID.class), eq(limit + 1)))
+          eq(articleId), anyInt(), any(LocalDateTime.class), eq(limit + 1)))
           .willReturn(comments);
 
       CursorPageResponseCommentDto result = commentService.getComments(
@@ -321,7 +321,7 @@ public class CommentServiceTest {
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
       then(commentRepository).should()
-          .findByArticleIdAfterCursorLikeCountDesc(eq(articleId), anyInt(), any(UUID.class), eq(limit + 1));
+          .findByArticleIdAfterCursorLikeCountDesc(eq(articleId), anyInt(), any(LocalDateTime.class), eq(limit + 1));
     }
   }
 }
