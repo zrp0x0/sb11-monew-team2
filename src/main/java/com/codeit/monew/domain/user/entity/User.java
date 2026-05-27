@@ -45,4 +45,8 @@ public class User extends BaseSoftDeleteEntity {
     public static User create(String email, String nickname, String passwordHash) {
         return new User(email, nickname, passwordHash);
     }
+
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
 }

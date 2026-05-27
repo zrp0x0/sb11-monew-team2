@@ -6,16 +6,19 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.codeit.monew.domain.user.dto.request.UserLoginRequest;
 import com.codeit.monew.domain.user.dto.request.UserRegisterRequest;
+import com.codeit.monew.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.monew.domain.user.dto.response.UserDto;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.exception.UserErrorCode;
 import com.codeit.monew.domain.user.exception.UserException;
 import com.codeit.monew.domain.user.repository.UserRepository;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -188,5 +192,102 @@ class UserServiceTest {
                 .isEqualTo(UserErrorCode.INVALID_CREDENTIALS);
 
         verify(passwordEncoder, never()).matches(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("사용자는 자신의 닉네임을 수정 가능")
+    void update_success() {
+        // given
+        UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        String email = "test@email.com";
+        String passwordHash = "$2y$04$CnmQ.L0MoRdQxDev/JnKaOKKDqae5Ja40NMIgep0h7xRbX6jhRzZm";
+        User user = User.create(email, "oldNickname", passwordHash);
+        ReflectionTestUtils.setField(user, "id", userId);
+        UserUpdateRequest request = new UserUpdateRequest("newNickname");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        // when
+        UserDto response = userService.update(userId, userId.toString(), request);
+
+        // then
+        assertThat(response.id()).isEqualTo(userId);
+        assertThat(response.email()).isEqualTo(email);
+        assertThat(response.nickname()).isEqualTo("newNickname");
+        assertThat(user.getEmail()).isEqualTo(email);
+        assertThat(user.getPasswordHash()).isEqualTo(passwordHash);
+        verify(userRepository).findById(userId);
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("요청자 헤더가 없으면 사용자 정보 수정에 실패")
+    void update_fail_whenRequestUserHeaderMissing() {
+        // given
+        UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UserUpdateRequest request = new UserUpdateRequest("newNickname");
+
+        // when & then
+        assertThatThrownBy(() -> userService.update(userId, null, request))
+                .isInstanceOf(UserException.class)
+                .extracting("errorCode")
+                .isEqualTo(UserErrorCode.REQUEST_USER_ID_REQUIRED);
+
+        verify(userRepository, never()).findById(any(UUID.class));
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("요청자 ID와 수정 대상 userId가 다르면 사용자 정보 수정에 실패")
+    void update_fail_whenRequestUserMismatched() {
+        // given
+        UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UUID requestUserId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        UserUpdateRequest request = new UserUpdateRequest("newNickname");
+
+        // when & then
+        assertThatThrownBy(() -> userService.update(userId, requestUserId.toString(), request))
+                .isInstanceOf(UserException.class)
+                .extracting("errorCode")
+                .isEqualTo(UserErrorCode.USER_ACCESS_DENIED);
+
+        verify(userRepository, never()).findById(any(UUID.class));
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자의 닉네임은 수정 불가")
+    void update_fail_whenUserNotFound() {
+        // given
+        UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UserUpdateRequest request = new UserUpdateRequest("newNickname");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> userService.update(userId, userId.toString(), request))
+                .isInstanceOf(UserException.class)
+                .extracting("errorCode")
+                .isEqualTo(UserErrorCode.USER_NOT_FOUND);
+
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("논리삭제된 사용자는 조회되지 않는 사용자와 동일하게 수정에 실패")
+    void update_fail_whenSoftDeletedUserExcluded() {
+        // given
+        UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UserUpdateRequest request = new UserUpdateRequest("newNickname");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> userService.update(userId, userId.toString(), request))
+                .isInstanceOf(UserException.class)
+                .extracting("errorCode")
+                .isEqualTo(UserErrorCode.USER_NOT_FOUND);
+
+        verifyNoInteractions(passwordEncoder);
     }
 }
