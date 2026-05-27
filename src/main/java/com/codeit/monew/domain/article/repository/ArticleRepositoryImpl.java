@@ -28,7 +28,6 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 
     @Override
     public CursorPageResponse<Article> searchArticles(ArticleSearchRequest request) {
-        validateLimit(request.limit());
 
         List<Article> articles = queryFactory
                 .selectFrom(article)
@@ -69,12 +68,6 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
     private BooleanExpression interestIdEq(UUID interestId) {
         // TODO: ArticleInterest 중간 테이블 구조 확정 후 interestId 필터 조건 추가
         return null;
-    }
-
-    private void validateLimit(int limit) {
-        if (limit <= 0) {
-            throw invalidSearchCondition("limit", limit);
-        }
     }
 
     private ArticleException invalidSearchCondition(String field, Object value) {
