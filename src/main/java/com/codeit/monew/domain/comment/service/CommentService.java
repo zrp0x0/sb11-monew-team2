@@ -5,6 +5,7 @@ import com.codeit.monew.domain.article.repository.ArticleRepository;
 import com.codeit.monew.domain.comment.dto.CommentDto;
 import com.codeit.monew.domain.comment.dto.CommentOrderBy;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
+import com.codeit.monew.domain.comment.dto.CommentUpdateRequest;
 import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
 import com.codeit.monew.domain.comment.dto.SortDirection;
 import com.codeit.monew.domain.comment.entity.Comment;
@@ -108,5 +109,20 @@ public class CommentService {
         .toList();
 
     return CursorPageResponseCommentDto.of(dtos, limit, totalElements, orderBy);
+  }
+
+  public CommentDto updateComment(UUID commentId, UUID userId, CommentUpdateRequest request) {
+    Comment comment = commentRepository.findById(commentId)
+        .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
+
+    if(!comment.getUser().getId().equals(userId)) {
+      throw new CommentException(CommentErrorCode.COMMENT_UNAUTHORIZED);
+    }
+
+    comment.update(request.content());
+
+    log.info("댓글 수정 성공. CommentId: {}, UserId: {}", commentId, userId);
+
+    return CommentDto.of(comment, comment.getUser().getNickname(), false);
   }
 }
