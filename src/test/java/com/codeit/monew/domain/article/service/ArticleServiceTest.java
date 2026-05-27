@@ -34,7 +34,7 @@ class ArticleServiceTest {
     private ArticleService articleService;
 
     @Test
-    @DisplayName("서비스에서 지원하는 뉴스 기사 출처 목록을 반환한다")
+    @DisplayName("서비스에서 지원하는 뉴스 기사 출처 목록 반환")
     void getSources_success() {
         // when
         List<String> sources = articleService.getSources();
@@ -49,7 +49,7 @@ class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("뉴스 기사 목록을 조회하고 ArticleDto 페이지 응답으로 변환한다")
+    @DisplayName("뉴스 기사 목록을 조회하고 ArticleDto 페이지 응답으로 변환")
     void searchArticles_success() {
         // given
         UUID requestUserId = UUID.randomUUID();
@@ -109,7 +109,7 @@ class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("뉴스 기사 목록 조회 시 limit이 0이하이면 예외가 발생")
+    @DisplayName("뉴스 기사 목록 조회 시 limit이 0이하이면 예외 발생")
     void searchArticles_invalidLimit() {
         // given
         ArticleSearchRequest request = new ArticleSearchRequest(
@@ -134,7 +134,7 @@ class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("뉴스 기사 목록 조회 시 지원하지 않는 정렬 기준이면 예외가 발생")
+    @DisplayName("뉴스 기사 목록 조회 시 지원하지 않는 정렬 기준이면 예외 발생")
     void searchArticles_invalidOrderBy() {
         // given
         ArticleSearchRequest request = new ArticleSearchRequest(
@@ -159,7 +159,7 @@ class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("뉴스 기사 목록 조회 시 지원하지 않는 정렬 방향이면 예외가 발생")
+    @DisplayName("뉴스 기사 목록 조회 시 지원하지 않는 정렬 방향이면 예외 발생")
     void searchArticles_invalidDirection() {
         // given
         ArticleSearchRequest request = new ArticleSearchRequest(
@@ -209,7 +209,7 @@ class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("뉴스 기사 목록 조회 시 cursor 형식이 올바르지 않으면 예외가 발생한다")
+    @DisplayName("뉴스 기사 목록 조회 시 cursor 형식이 올바르지 않으면 예외 발생")
     void searchArticles_invalidCursorFormat() {
         // given
         ArticleSearchRequest request = new ArticleSearchRequest(
@@ -234,7 +234,7 @@ class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("뉴스 기사 목록 조회 시 commentCount cursor 값이 숫자가 아니면 예외가 발생한다")
+    @DisplayName("뉴스 기사 목록 조회 시 commentCount cursor 값이 숫자가 아니면 예외 발생")
     void searchArticles_invalidCommentCountCursorValue() {
         // given
         ArticleSearchRequest request = new ArticleSearchRequest(
