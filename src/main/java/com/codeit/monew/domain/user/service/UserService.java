@@ -1,5 +1,6 @@
 package com.codeit.monew.domain.user.service;
 
+import com.codeit.monew.domain.user.dto.request.UserLoginRequest;
 import com.codeit.monew.domain.user.dto.request.UserRegisterRequest;
 import com.codeit.monew.domain.user.dto.response.UserDto;
 import com.codeit.monew.domain.user.entity.User;
@@ -40,5 +41,17 @@ public class UserService {
         } catch (DataIntegrityViolationException e) {
             throw new UserException(UserErrorCode.EMAIL_DUPLICATION);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public UserDto login(UserLoginRequest request) {
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new UserException(UserErrorCode.INVALID_CREDENTIALS));
+
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new UserException(UserErrorCode.INVALID_CREDENTIALS);
+        }
+
+        return UserDto.from(user);
     }
 }

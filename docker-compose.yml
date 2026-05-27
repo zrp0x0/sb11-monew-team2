@@ -1,7 +1,8 @@
 services:
-  postgres:
+  # 로컬 개발용 DB
+  postgres-dev:
     image: postgres:16-alpine
-    container_name: monew-postgres
+    container_name: monew-postgres-dev
     ports:
       - "5432:5432"
     environment:
@@ -9,4 +10,13 @@ services:
       - POSTGRES_PASSWORD=pass
       - POSTGRES_DB=monew_db
 
-## 실행: docker-compose up -d
+  # 로컬 테스트용 DB
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: monew-postgres-test
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=monew_test
