@@ -10,14 +10,13 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
           POSTGRES_DB: monew_test
           POSTGRES_USER: user
           POSTGRES_PASSWORD: pass
         ports:
-          - 5432:5432
-        # DB가 준비될 때까지 헬스체크 대기
+          - 5433:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -33,17 +32,20 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
-          cache: 'gradle'
+
+      # 공식 Gradle Action 추가
+      - name: 2-1. Gradle 캐시 설정
+        uses: gradle/actions/setup-gradle@v3
 
       - name: 3. gradlew에 실행 권한 부여하기
         run: chmod +x gradlew
 
       - name: 4. 데이터베이스 연결 및 프로젝트 빌드 및 커버리지 검사하기 (테스트 실행)
-        # 테스트 실행 후, 80% 룰(jacocoTestCoverageVerification)까지 검사!
+        # 테스트 실행 후, 80% 룰(jacocoTestCoverageVerification)까지 검사
         env:
           DB_HOST: localhost
-          DB_PORT: 5432
+          DB_PORT: 5433
           DB_NAME: monew_test
           DB_USER: user
           DB_PASSWORD: pass
-        run: ./gradlew build jacocoTestCoverageVerification
+        run: ./gradlew test jacocoTestCoverageVerification --no-daemons
