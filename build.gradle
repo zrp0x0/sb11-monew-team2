@@ -67,7 +67,6 @@ jacocoTestReport {
             fileTree(dir: it,
                     includes: [
                             'com/codeit/monew/domain/**/service/**',
-                            'com/codeit/monew/domain/**/repository/**'
                     ],
                     excludes: Qdomains)
         }))
@@ -80,7 +79,6 @@ jacocoTestCoverageVerification {
             fileTree(dir: it,
                     includes: [
                             'com/codeit/monew/domain/**/service/**',
-                            'com/codeit/monew/domain/**/repository/**'
                     ],
                     excludes: Qdomains)
         }))
