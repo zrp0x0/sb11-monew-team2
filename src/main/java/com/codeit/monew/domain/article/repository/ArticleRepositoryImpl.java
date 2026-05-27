@@ -5,13 +5,19 @@ import static com.codeit.monew.domain.article.entity.QArticle.article;
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
+import com.codeit.monew.domain.article.exception.ArticleErrorCode;
+import com.codeit.monew.domain.article.exception.ArticleException;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.Map;
 import java.util.List;
+import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 
@@ -28,6 +34,7 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
                 .selectFrom(article)
                 .where(
                         notDeleted(),
+                        interestIdEq(request.interestId()),
                         keywordContains(request.keyword()),
                         sourceIn(request.sourceIn()),
                         publishedAtGoe(request.publishDateFrom()),
@@ -59,10 +66,22 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
         );
     }
 
+    private BooleanExpression interestIdEq(UUID interestId) {
+        // TODO: ArticleInterest 중간 테이블 구조 확정 후 interestId 필터 조건 추가
+        return null;
+    }
+
     private void validateLimit(int limit) {
         if (limit <= 0) {
-            throw new IllegalArgumentException("limit은 1 이상이어야 합니다.");
+            throw invalidSearchCondition("limit", limit);
         }
+    }
+
+    private ArticleException invalidSearchCondition(String field, Object value) {
+        return new ArticleException(
+                ArticleErrorCode.INVALID_ARTICLE_SEARCH_CONDITION,
+                Map.of(field, String.valueOf(value))
+        );
     }
 
     private Long countTotalElements(ArticleSearchRequest request) {
@@ -71,6 +90,7 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
                 .from(article)
                 .where(
                         notDeleted(),
+                        interestIdEq(request.interestId()),
                         keywordContains(request.keyword()),
                         sourceIn(request.sourceIn()),
                         publishedAtGoe(request.publishDateFrom()),
@@ -124,17 +144,20 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
         return switch (request.orderBy()) {
             case "publishDate" -> new OrderSpecifier<?>[] {
                     new OrderSpecifier<>(order, article.publishedAt),
-                    new OrderSpecifier<>(order, article.createdAt)
+                    new OrderSpecifier<>(order, article.createdAt),
+                    new OrderSpecifier<>(order, article.id)
             };
             case "commentCount" -> new OrderSpecifier<?>[] {
                     new OrderSpecifier<>(order, article.commentCount),
-                    new OrderSpecifier<>(order, article.createdAt)
+                    new OrderSpecifier<>(order, article.createdAt),
+                    new OrderSpecifier<>(order, article.id)
             };
             case "viewCount" -> new OrderSpecifier<?>[] {
                     new OrderSpecifier<>(order, article.viewCount),
-                    new OrderSpecifier<>(order, article.createdAt)
+                    new OrderSpecifier<>(order, article.createdAt),
+                    new OrderSpecifier<>(order, article.id)
             };
-            default -> throw new IllegalArgumentException("지원하지 않는 정렬 기준입니다.");
+            default -> throw invalidSearchCondition("orderBy", request.orderBy());
         };
     }
 
@@ -147,7 +170,24 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
             return false;
         }
 
-        throw new IllegalArgumentException("지원하지 않는 정렬 방향입니다.");
+        throw invalidSearchCondition("direction", direction);
+    }
+
+    private record ParsedCursor(String value, UUID articleId) {
+    }
+
+    private ParsedCursor parseCursor(String cursor) {
+        String[] parts = cursor.split("\\|", 2);
+
+        if (parts.length != 2 || !StringUtils.hasText(parts[0]) || !StringUtils.hasText(parts[1])) {
+            throw invalidSearchCondition("cursor", cursor);
+        }
+
+        try {
+            return new ParsedCursor(parts[0], UUID.fromString(parts[1]));
+        } catch (IllegalArgumentException e) {
+            throw invalidSearchCondition("cursor", cursor);
+        }
     }
 
     private BooleanExpression cursorCondition(ArticleSearchRequest request) {
@@ -155,89 +195,116 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
             return null;
         }
 
+        if (request.after() == null) {
+            throw invalidSearchCondition("after", null);
+        }
+
+        ParsedCursor parsedCursor = parseCursor(request.cursor());
         boolean ascending = isAscending(request.direction());
 
-        return switch (request.orderBy()) {
-            case "publishDate" -> publishDateCursorCondition(
-                    LocalDateTime.parse(request.cursor()),
-                    request.after(),
-                    ascending
-            );
-            case "commentCount" -> commentCountCursorCondition(
-                    Long.valueOf(request.cursor()),
-                    request.after(),
-                    ascending
-            );
-            case "viewCount" -> viewCountCursorCondition(
-                    Long.valueOf(request.cursor()),
-                    request.after(),
-                    ascending
-            );
-            default -> throw new IllegalArgumentException("지원하지 않는 정렬 기준입니다.");
-        };
+        try{
+            return switch (request.orderBy()) {
+                case "publishDate" -> publishDateCursorCondition(
+                        LocalDateTime.parse(request.cursor()),
+                        request.after(),
+                        parsedCursor.articleId(),
+                        ascending
+                );
+                case "commentCount" -> commentCountCursorCondition(
+                        Long.valueOf(request.cursor()),
+                        request.after(),
+                        parsedCursor.articleId(),
+                        ascending
+                );
+                case "viewCount" -> viewCountCursorCondition(
+                        Long.valueOf(request.cursor()),
+                        request.after(),
+                        parsedCursor.articleId(),
+                        ascending
+                );
+                default -> throw invalidSearchCondition("orderBy", request.orderBy());
+            };
+        } catch (NumberFormatException | DateTimeParseException e) {
+            throw invalidSearchCondition("cursor", request.cursor());
+        }
     }
 
     private BooleanExpression publishDateCursorCondition(
             LocalDateTime cursor,
             LocalDateTime after,
+            UUID articleId,
             boolean ascending
     ) {
         BooleanExpression primaryCondition = ascending
                 ? article.publishedAt.gt(cursor)
                 : article.publishedAt.lt(cursor);
 
-        if (after == null) {
-            return primaryCondition;
-        }
-
-        BooleanExpression tieBreakerCondition = article.publishedAt.eq(cursor)
+        BooleanExpression createdAtTieBreaker = article.publishedAt.eq(cursor)
                 .and(ascending
                         ? article.createdAt.gt(after)
                         : article.createdAt.lt(after));
 
-        return primaryCondition.or(tieBreakerCondition);
+        BooleanExpression idTieBreaker = article.publishedAt.eq(cursor)
+                .and(article.createdAt.eq(after))
+                .and(ascending
+                        ? article.id.gt(articleId)
+                        : article.id.lt(articleId));
+
+        return primaryCondition
+                .or(createdAtTieBreaker)
+                .or(idTieBreaker);
     }
 
     private BooleanExpression commentCountCursorCondition(
             Long cursor,
             LocalDateTime after,
+            UUID articleId,
             boolean ascending
     ) {
         BooleanExpression primaryCondition = ascending
                 ? article.commentCount.gt(cursor)
                 : article.commentCount.lt(cursor);
 
-        if (after == null) {
-            return primaryCondition;
-        }
-
-        BooleanExpression tieBreakerCondition = article.commentCount.eq(cursor)
+        BooleanExpression createdAtTieBreaker = article.commentCount.eq(cursor)
                 .and(ascending
                         ? article.createdAt.gt(after)
                         : article.createdAt.lt(after));
 
-        return primaryCondition.or(tieBreakerCondition);
+        BooleanExpression idTieBreaker = article.commentCount.eq(cursor)
+                .and(article.createdAt.eq(after))
+                .and(ascending
+                        ? article.id.gt(articleId)
+                        : article.id.lt(articleId));
+
+        return primaryCondition
+                .or(createdAtTieBreaker)
+                .or(idTieBreaker);
     }
 
     private BooleanExpression viewCountCursorCondition(
             Long cursor,
             LocalDateTime after,
+            UUID articleId,
             boolean ascending
     ) {
         BooleanExpression primaryCondition = ascending
                 ? article.viewCount.gt(cursor)
                 : article.viewCount.lt(cursor);
 
-        if (after == null) {
-            return primaryCondition;
-        }
-
-        BooleanExpression tieBreakerCondition = article.viewCount.eq(cursor)
+        BooleanExpression createdAtTieBreaker = article.viewCount.eq(cursor)
                 .and(ascending
                         ? article.createdAt.gt(after)
                         : article.createdAt.lt(after));
 
-        return primaryCondition.or(tieBreakerCondition);
+        BooleanExpression idTieBreaker = article.viewCount.eq(cursor)
+                .and(article.createdAt.eq(after))
+                .and(ascending
+                        ? article.id.gt(articleId)
+                        : article.id.lt(articleId));
+
+        return primaryCondition
+                .or(createdAtTieBreaker)
+                .or(idTieBreaker);
     }
 
     private String getNextCursor(List<Article> content, String orderBy, boolean hasNext) {
@@ -248,10 +315,10 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
         Article lastArticle = content.get(content.size() - 1);
 
         return switch (orderBy) {
-            case "publishDate" -> lastArticle.getPublishedAt().toString();
-            case "commentCount" -> String.valueOf(lastArticle.getCommentCount());
-            case "viewCount" -> String.valueOf(lastArticle.getViewCount());
-            default -> throw new IllegalArgumentException("지원하지 않는 정렬 기준입니다.");
+            case "publishDate" -> lastArticle.getPublishedAt() + "|" + lastArticle.getId();
+            case "commentCount" -> lastArticle.getCommentCount() + "|" + lastArticle.getId();
+            case "viewCount" -> lastArticle.getViewCount() + "|" + lastArticle.getId();
+            default -> throw invalidSearchCondition("orderBy", orderBy);
         };
     }
 
