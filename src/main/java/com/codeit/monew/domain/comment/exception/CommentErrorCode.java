@@ -15,6 +15,8 @@ public enum CommentErrorCode implements ErrorCode {
 
   COMMENT_UNAUTHORIZED(HttpStatus.FORBIDDEN, "COMMENT_UNAUTHORIZED", "댓글 작성자만 수정할 수 있습니다."),
 
+  INVALID_UUID_FORMAT(HttpStatus.BAD_REQUEST, "INVALIID_UUID_FORMAT", "UUID 형식이 올바르지 않습니다."),
+
   INVALID_CURSOR_PARAMETER(HttpStatus.BAD_REQUEST, "INVALID_CURSOR_PARAMETER", "잘못된 페이지네이션 파라미터입니다.");
 
   private final HttpStatus httpStatus;

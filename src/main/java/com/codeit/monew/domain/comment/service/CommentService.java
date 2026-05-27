@@ -105,17 +105,25 @@ public class CommentService {
   }
 
   @Transactional
-  public CommentDto updateComment(UUID commentId, UUID userId, CommentUpdateRequest request) {
-    Comment comment = commentRepository.findById(commentId)
+  public CommentDto updateComment(String commentId, String userId, CommentUpdateRequest request) {
+    UUID commentUUID;
+    UUID userUUID;
+    try {
+      commentUUID = UUID.fromString(commentId);
+      userUUID = UUID.fromString(userId);
+    } catch (IllegalArgumentException e) {
+      throw new CommentException(CommentErrorCode.INVALID_UUID_FORMAT);
+    }
+    Comment comment = commentRepository.findById(commentUUID)
         .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
 
-    if(!comment.getUser().getId().equals(userId)) {
+    if(!comment.getUser().getId().equals(userUUID)) {
       throw new CommentException(CommentErrorCode.COMMENT_UNAUTHORIZED);
     }
 
     comment.update(request.content());
 
-    log.info("댓글 수정 성공. CommentId: {}, UserId: {}", commentId, userId);
+    log.info("댓글 수정 성공. CommentId: {}, UserId: {}", commentUUID, userUUID);
 
     return CommentDto.of(comment, comment.getUser().getNickname(), false);
   }
