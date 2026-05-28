@@ -7,6 +7,13 @@ import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.exception.ArticleErrorCode;
 import com.codeit.monew.domain.article.exception.ArticleException;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
+import com.codeit.monew.domain.articleView.dto.response.ArticleViewDto;
+import com.codeit.monew.domain.articleView.entity.ArticleView;
+import com.codeit.monew.domain.articleView.repository.ArticleViewRepository;
+import com.codeit.monew.domain.user.entity.User;
+import com.codeit.monew.domain.user.exception.UserErrorCode;
+import com.codeit.monew.domain.user.exception.UserException;
+import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.dto.CursorPageResponse;
 
 import java.time.LocalDateTime;
@@ -26,6 +33,8 @@ import org.springframework.util.StringUtils;
 public class ArticleService {
 
     private final ArticleRepository articleRepository;
+    private final ArticleViewRepository articleViewRepository;
+    private final UserRepository userRepository;
 
     public List<String> getSources() {
         return Arrays.stream(ArticleSource.values())
@@ -52,6 +61,35 @@ public class ArticleService {
                 articlePage.totalElements(),
                 articlePage.hasNext()
         );
+    }
+
+    @Transactional
+    public ArticleViewDto registerArticleView(UUID articleId, String requestUserIdHeader) {
+        UUID requestUserId = parseRequestUserId(requestUserIdHeader);
+        User user = userRepository.findById(requestUserId)
+                .orElseThrow(() -> new UserException(UserErrorCode.INVALID_CREDENTIALS));
+        Article article = articleRepository.findById(articleId)
+                .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
+
+        return articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId)
+                .map(ArticleViewDto::from)
+                .orElseGet(() -> {
+                    ArticleView articleView = articleViewRepository.save(ArticleView.create(user, article));
+                    article.increaseViewCount();
+                    return ArticleViewDto.from(articleView);
+                });
+    }
+
+    private UUID parseRequestUserId(String requestUserIdHeader) {
+        if (!StringUtils.hasText(requestUserIdHeader)) {
+            throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
+        }
+
+        try {
+            return UUID.fromString(requestUserIdHeader);
+        } catch (IllegalArgumentException e) {
+            throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
+        }
     }
 
     private void validateSearchRequest(ArticleSearchRequest request) {
