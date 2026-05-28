@@ -122,7 +122,6 @@ public class InterestService {
   // Levenshtein 알고리즘을 활용한 유사도 검증 헬퍼 메서드
   private void checkOptimizedSimilarity(String newName) {
     int len = newName.length();
-
     int minLength = Math.max(1, len - LENGTH_MARGIN);
     int maxLength = len + LENGTH_MARGIN;
 
@@ -132,18 +131,26 @@ public class InterestService {
 
     LevenshteinDistance levenshteinDistance = new LevenshteinDistance();
 
+    // 새 단어를 자모 분해 처리
+    String decomposedNewName = Normalizer.normalize(newName, Form.NFD);
+
     for (Interest existing : candidates) {
       String existingName = existing.getName();
 
-      int distance = levenshteinDistance.apply(newName, existingName);
-      int maxLen = Math.max(len, existingName.length());
+      // 기존 단어도 자모 분해 처리
+      String decomposedExistingName = Normalizer.normalize(existingName, Form.NFD);
+
+      // 쪼개진 모음/자음 상태로 거리 계산
+      int distance = levenshteinDistance.apply(decomposedNewName, decomposedExistingName);
+      int maxLen = Math.max(decomposedNewName.length(), decomposedExistingName.length());
 
       double similarity = 1.0 - ((double) distance / maxLen);
 
-      double threshold = (maxLen <= 3) ? 0.6 : 0.8; // 글자가 3글자보다 작으면 60%, 크면 80%로 유사도 기준 설정
+      double threshold = 0.8;
 
       if (similarity >= threshold) {
-        log.warn("유사도 충돌 - 요청: {}, 기존: {}, 임계값: {}, 유사도: {}", newName, existingName, threshold, similarity);
+        log.warn("유사도 충돌 - 요청: {}, 기존: {}, 임계값: {}, 유사도: {}", newName, existingName, threshold,
+            similarity);
         throw new InterestException(InterestErrorCode.SIMILAR_INTEREST_EXISTS, Map.of(
             "requestedName", newName,
             "similarName", existingName,
