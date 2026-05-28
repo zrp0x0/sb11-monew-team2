@@ -123,4 +123,42 @@ class ArticleControllerTest {
         assertThat(request.limit()).isEqualTo(10);
         assertThat(request.requestUserId()).isEqualTo(requestUserId);
     }
+
+    @Test
+    @DisplayName("뉴스 기사 단건 조회에 성공한다")
+    void getArticle_success() throws Exception {
+        // given
+        UUID articleId = UUID.randomUUID();
+        UUID requestUserId = UUID.randomUUID();
+
+        ArticleDto articleDto = new ArticleDto(
+                articleId,
+                ArticleSource.NAVER,
+                "https://news.naver.com/sample",
+                "테스트 기사 제목",
+                LocalDateTime.of(2026, 5, 27, 10, 30),
+                "테스트 기사 요약",
+                3L,
+                10L,
+                false
+        );
+
+        when(articleService.getArticle(articleId, requestUserId.toString()))
+                .thenReturn(articleDto);
+
+        // when & then
+        mockMvc.perform(get("/api/articles/{articleId}", articleId)
+                .header("Monew-Request-User-ID", requestUserId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(articleId.toString()))
+                .andExpect(jsonPath("$.source").value("NAVER"))
+                .andExpect(jsonPath("$.sourceUrl").value("https://news.naver.com/sample"))
+                .andExpect(jsonPath("$.title").value("테스트 기사 제목"))
+                .andExpect(jsonPath("$.summary").value("테스트 기사 요약"))
+                .andExpect(jsonPath("$.commentCount").value(3))
+                .andExpect(jsonPath("$.viewCount").value(10))
+                .andExpect(jsonPath("$.viewedByMe").value(false));
+
+        verify(articleService).getArticle(articleId, requestUserId.toString());
+    }
 }
