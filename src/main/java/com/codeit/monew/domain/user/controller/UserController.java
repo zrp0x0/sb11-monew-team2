@@ -1,15 +1,21 @@
 package com.codeit.monew.domain.user.controller;
 
+import com.codeit.monew.domain.user.dto.request.UserLoginRequest;
 import com.codeit.monew.domain.user.dto.request.UserRegisterRequest;
+import com.codeit.monew.domain.user.dto.request.UserUpdateRequest;
 import com.codeit.monew.domain.user.dto.response.UserDto;
 import com.codeit.monew.domain.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,5 +34,25 @@ public class UserController {
     public UserDto registerUser(@Valid @RequestBody UserRegisterRequest request) {
         log.info("회원가입 요청 시작");
         return userService.register(request);
+    }
+
+    @Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인합니다.")
+    @PostMapping("/login")
+    @ResponseStatus(HttpStatus.OK)
+    public UserDto login(@Valid @RequestBody UserLoginRequest request) {
+        log.info("로그인 요청 시작");
+        return userService.login(request);
+    }
+
+    @Operation(summary = "사용자 정보 수정", description = "인증된 사용자의 닉네임을 수정합니다.")
+    @PatchMapping("/{userId}")
+    @ResponseStatus(HttpStatus.OK)
+    public UserDto updateUser(
+            @PathVariable UUID userId,
+            @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId,
+            @Valid @RequestBody UserUpdateRequest request
+    ) {
+        log.info("사용자 정보 수정 요청 시작. UserId: {}", userId);
+        return userService.update(userId, requestUserId, request);
     }
 }

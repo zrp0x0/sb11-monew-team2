@@ -9,6 +9,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// TODO: InterestController랑 통합
+// TODO: InterestController랑 통합 예정
 
 @Slf4j
 @RestController
@@ -33,7 +34,19 @@ public class SubscriptionController {
         @PathVariable UUID interestId,
         @RequestHeader(HEADER_USER_ID) UUID requestUserId
     ) {
+        log.info("관심사 구독 요청 시작.");
         return subscriptionService.createSubscription(interestId, requestUserId);
+    }
+
+    @Operation(summary = "관심사 구독 취소", description = "관심사 구독을 취소합니다.")
+    @DeleteMapping("/{interestId}/subscriptions")
+    @ResponseStatus(HttpStatus.OK)
+    public void cancelSubscription(
+        @PathVariable UUID interestId,
+        @RequestHeader(HEADER_USER_ID) UUID requestUserId
+    ) {
+        log.info("관심사 구독 취소 요청 시작");
+        subscriptionService.cancelSubscription(interestId, requestUserId);
     }
 
 }

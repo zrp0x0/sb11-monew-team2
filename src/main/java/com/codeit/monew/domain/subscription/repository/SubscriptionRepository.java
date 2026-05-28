@@ -1,12 +1,11 @@
 package com.codeit.monew.domain.subscription.repository;
 
 import com.codeit.monew.domain.subscription.entity.Subscription;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
-import java.util.Optional;
-import java.util.UUID;
 
 public interface SubscriptionRepository extends JpaRepository<Subscription, UUID> {
 
@@ -14,4 +13,5 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     Optional<Subscription> findByInterestIdAndUserIdWithInterest(
         @Param("interestId") UUID interestId, @Param("userId") UUID userId);
 
+    Optional<Subscription> findByInterestIdAndUserId(UUID interestId, UUID userId);
 }
