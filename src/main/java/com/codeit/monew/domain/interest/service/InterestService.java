@@ -1,12 +1,20 @@
 package com.codeit.monew.domain.interest.service;
 
 import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
+import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestUpdateRequest;
 import com.codeit.monew.domain.interest.dto.response.InterestResponse;
 import com.codeit.monew.domain.interest.entity.Interest;
 import com.codeit.monew.domain.interest.exception.InterestErrorCode;
 import com.codeit.monew.domain.interest.exception.InterestException;
 import com.codeit.monew.domain.interest.repository.InterestRepository;
+import com.codeit.monew.domain.subscription.repository.SubscriptionRepository;
+import com.codeit.monew.domain.user.exception.UserErrorCode;
+import com.codeit.monew.domain.user.exception.UserException;
+import com.codeit.monew.domain.user.repository.UserRepository;
+import com.codeit.monew.global.dto.CursorPageResponse;
+import java.text.Normalizer;
+import java.text.Normalizer.Form;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,15 +30,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class InterestService {
 
   private final InterestRepository interestRepository;
+  private final UserRepository userRepository;
+  private final SubscriptionRepository subscriptionRepository;
 
   private static final int LENGTH_MARGIN = 2; // +- 2글자까지만 비교 허용
 
   @Transactional
-  public InterestResponse create(InterestRegisterRequest request) {
+  public InterestResponse createInterest(InterestRegisterRequest request) {
     log.debug("interest register 시작 - 입력값: {}", request);
     String name = request.name();
 
-    if(interestRepository.existsByName(name)) {
+    if (interestRepository.existsByName(name)) {
       throw new InterestException(InterestErrorCode.INTEREST_ALREADY_EXISTS, Map.of("name", name));
     }
 
@@ -44,15 +54,69 @@ public class InterestService {
   }
 
   @Transactional
-  public InterestResponse update(UUID interestId, InterestUpdateRequest request) {
+  public InterestResponse updateInterest(UUID interestId, InterestUpdateRequest request) {
     log.debug("interest update 시작 - 입력값: {}, {}", interestId, request);
     Interest interest = interestRepository.findById(interestId)
-        .orElseThrow(() -> new InterestException(InterestErrorCode.INTEREST_NOT_FOUND, Map.of("interestId", interestId)));
+        .orElseThrow(() -> new InterestException(InterestErrorCode.INTEREST_NOT_FOUND,
+            Map.of("interestId", interestId)));
 
     interest.updateKeywords(request.keywords());
     log.info("interest update 완료 - interestId: {}", interestId);
 
     return InterestResponse.from(interest);
+  }
+
+  @Transactional(readOnly = true)
+  public CursorPageResponse<InterestResponse> searchInterest(UUID userId,
+      InterestSearchRequest request) {
+    log.debug("interest search 시작 - 입력값: {}, {}", userId, request);
+    if (!userRepository.existsById(userId)) {
+      throw new UserException(UserErrorCode.INVALID_CREDENTIALS, Map.of("userId", userId));
+    }
+
+    List<Interest> interestList = interestRepository.findAllByCondition(request);
+
+    boolean hasNext = false;
+    if (interestList.size() > request.getLimit()) {
+      hasNext = true;
+      interestList = interestList.subList(0, request.getLimit());
+    }
+
+    if (interestList.isEmpty()) {
+      return new CursorPageResponse<>(List.of(), null, null, request.getLimit(), 0L, false);
+    }
+
+    List<UUID> interestIds = interestList.stream()
+        .map(Interest::getId)
+        .toList();
+
+    List<UUID> subscribedInterestIds = subscriptionRepository.findSubscribedInterestIds(userId,
+        interestIds);
+
+    List<InterestResponse> content = interestList.stream()
+        .map(interest -> {
+          boolean subscribedByMe = subscribedInterestIds.contains(interest.getId());
+          return InterestResponse.of(interest, subscribedByMe);
+        })
+        .toList();
+
+    Interest lastInterest = interestList.get(interestList.size() - 1);
+
+    String nextCursor = request.getOrderBy().equals("subscriberCount")
+        ? String.valueOf(lastInterest.getSubscriberCount())
+        : lastInterest.getName();
+
+    String nextAfter = hasNext ? String.valueOf(lastInterest.getCreatedAt()) : null;
+    log.debug("interest search 완료 - 응답 사이즈: {}, hasNext: {}", content.size(), hasNext);
+
+    return new CursorPageResponse<InterestResponse>(
+        content,
+        hasNext ? nextCursor : null,
+        nextAfter,
+        request.getLimit(),
+        0L,
+        hasNext
+    );
   }
 
   // Levenshtein 알고리즘을 활용한 유사도 검증 헬퍼 메서드
