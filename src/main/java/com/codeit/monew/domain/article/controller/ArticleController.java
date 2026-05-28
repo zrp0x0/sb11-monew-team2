@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
@@ -85,5 +86,15 @@ public class ArticleController {
     ) {
         log.info("기사 뷰 등록 요청. articleId: {}, requestUserId: {}", articleId, requestUserId);
         return articleService.registerArticleView(articleId, requestUserId);
+    }
+}
+    @Operation(summary = "뉴스 기사 단건 조회", description = "뉴스 기사 ID로 뉴스 기사 단건을 조회합니다.")
+    @GetMapping("/{articleId}")
+    public ArticleDto getArticle(
+            @PathVariable UUID articleId,
+            @RequestHeader(value = "Monew-Request-User-Id", required = false) String requestUserId
+    ) {
+        log.info("뉴스 기사 단건 조회 요청. articleId: {}, requestUserId: {}", articleId, requestUserId);
+        return articleService.getArticle(articleId, requestUserId);
     }
 }

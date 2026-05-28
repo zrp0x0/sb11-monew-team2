@@ -19,6 +19,18 @@ public enum ArticleErrorCode implements ErrorCode {
             HttpStatus.NOT_FOUND,
             "ARTICLE_NOT_FOUND",
             "뉴스 기사 정보가 없습니다."
+    ),
+
+    REQUEST_USER_ID_REQUIRED(
+            HttpStatus.UNAUTHORIZED,
+            "REQUEST_USER_ID_REQUIRED",
+            "요청자 ID 헤더가 필요합니다."
+    ),
+
+    INVALID_REQUEST_USER_ID(
+            HttpStatus.BAD_REQUEST,
+            "INVALID_REQUEST_USER_ID",
+            "요청자 ID 형식이 올바르지 않습니다."
     );
 
     private final HttpStatus httpStatus;

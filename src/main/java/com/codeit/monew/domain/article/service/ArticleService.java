@@ -152,3 +152,27 @@ public class ArticleService {
         );
     }
 }
+
+    @Transactional(readOnly = true)
+    public ArticleDto getArticle(UUID articleId, String requestUserId) {
+        UUID parsedRequestUserId = parseRequestUserId(requestUserId);
+
+        Article article = articleRepository.findByIdAndDeletedAtIsNull(articleId)
+                .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
+
+        // Todo: viewedByMe false로 두고 추후 고도화
+        return ArticleDto.from(article, false);
+    }
+
+    private UUID parseRequestUserId(String requestUserId) {
+        if (!StringUtils.hasText(requestUserId)) {
+            throw new ArticleException(ArticleErrorCode.REQUEST_USER_ID_REQUIRED);
+        }
+
+        try {
+            return UUID.fromString(requestUserId);
+        } catch (IllegalArgumentException e) {
+            throw new ArticleException(ArticleErrorCode.INVALID_REQUEST_USER_ID);
+        }
+    }
+}
