@@ -22,7 +22,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
   List<UUID> findSubscribedInterestIds(
       @Param("userId") UUID userId, @Param("interestIds") List<UUID> interestIds);
 
-  @Modifying
+  @Modifying(clearAutomatically = true)
   @Query("DELETE FROM Subscription s WHERE s.interest.id = :interestId")
   void deleteByInterestId(@Param("interestId") UUID interestId);
 }
