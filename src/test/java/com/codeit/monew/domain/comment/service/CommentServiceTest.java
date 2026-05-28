@@ -333,17 +333,17 @@ public class CommentServiceTest {
     @Test
     @DisplayName("유효한 요청일 경우 댓글을 수정하고 CommentDto를 반환")
     void updateComment_ValidRequest_UpdateAndReturnsDto() {
-      String commentId = UUID.randomUUID().toString();
+      UUID commentId = UUID.randomUUID();
       CommentUpdateRequest request = new CommentUpdateRequest("updateTest");
 
       Comment comment = Comment.create(article, user, "test");
 
-      given(commentRepository.findById(UUID.fromString(commentId))).willReturn(Optional.of(comment));
+      given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
       given(user.getId()).willReturn(userId);
       given(user.getNickname()).willReturn("tester");
       given(article.getId()).willReturn(articleId);
 
-      CommentDto result = commentService.updateComment(commentId, userId.toString(), request);
+      CommentDto result = commentService.updateComment(commentId, userId, request);
 
       assertThat(result.content()).isEqualTo("updateTest");
       assertThat(result.userNickname()).isEqualTo("tester");
@@ -352,25 +352,25 @@ public class CommentServiceTest {
     @Test
     @DisplayName("존재하지 않는 commentId이면 CommentException을 던짐")
     void updateComment_CommentNotFound_ThrowsCommentException() {
-      String commentId = UUID.randomUUID().toString();
+      UUID commentId = UUID.randomUUID();
       CommentUpdateRequest request = new CommentUpdateRequest("updateTest");
 
-      given(commentRepository.findById(UUID.fromString(commentId))).willReturn(Optional.empty());
+      given(commentRepository.findById(commentId)).willReturn(Optional.empty());
 
-      assertThatThrownBy(() -> commentService.updateComment(commentId, userId.toString(), request))
+      assertThatThrownBy(() -> commentService.updateComment(commentId, userId, request))
           .isInstanceOf(CommentException.class);
     }
 
     @Test
     @DisplayName("댓글 작성자가 아닐 경우 CommentException을 던짐")
     void updateComment_IsNotCommentOwner_ThrowsCommentException() {
-      String commentId = UUID.randomUUID().toString();
-      String otherUserId = UUID.randomUUID().toString();
+      UUID commentId = UUID.randomUUID();
+      UUID otherUserId = UUID.randomUUID();
       CommentUpdateRequest request = new CommentUpdateRequest("updateTest");
 
       Comment comment = Comment.create(article, user, "test");
 
-      given(commentRepository.findById(UUID.fromString(commentId))).willReturn(Optional.of(comment));
+      given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
       given(user.getId()).willReturn(userId);
 
       assertThatThrownBy(() -> commentService.updateComment(commentId, otherUserId, request))
