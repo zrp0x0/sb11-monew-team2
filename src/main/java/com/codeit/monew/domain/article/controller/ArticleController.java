@@ -4,6 +4,7 @@ import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
 import com.codeit.monew.domain.article.dto.response.ArticleDto;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.service.ArticleService;
+import com.codeit.monew.domain.articleView.dto.response.ArticleViewDto;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.LocalDateTime;
@@ -13,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -72,5 +75,15 @@ public class ArticleController {
                 requestUserId, orderBy, direction, limit);
 
         return articleService.searchArticles(request);
+    }
+
+    @Operation(summary = "기사 뷰 등록", description = "기사 뷰를 등록합니다.")
+    @PostMapping("/{articleId}/article-views")
+    public ArticleViewDto registerArticleView(
+            @PathVariable UUID articleId,
+            @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId
+    ) {
+        log.info("기사 뷰 등록 요청. articleId: {}, requestUserId: {}", articleId, requestUserId);
+        return articleService.registerArticleView(articleId, requestUserId);
     }
 }
