@@ -9,10 +9,10 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -22,13 +22,15 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
-@Table(name = "article_views", indexes = {
-        @Index(
-                name = "idx_article_view_user_article",
-                columnList = "user_id, article_id",
-                unique = true
-        )
-})
+@Table(
+        name = "article_views",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_article_views_user_article",
+                        columnNames = {"user_id", "article_id"} // 제약 조건 관점에서 선언
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
