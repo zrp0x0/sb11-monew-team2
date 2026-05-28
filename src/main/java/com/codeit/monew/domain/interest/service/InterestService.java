@@ -73,7 +73,7 @@ public class InterestService {
       throw new InterestException(InterestErrorCode.INTEREST_NOT_FOUND, Map.of("interestId", interestId));
     }
 
-    // TODO: 알림, 기사와 연관된 코드가 구현될 시 함께 삭제 추가
+    // TODO: 관심사와 연관된 코드(알림, 기사)가 구현될 시 함께 삭제 예정
     subscriptionRepository.deleteByInterestId(interestId);
     interestRepository.deleteById(interestId);
     log.info("interest delete - interestId: {}", interestId);
