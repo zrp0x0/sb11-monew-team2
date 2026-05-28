@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -51,5 +52,12 @@ public class InterestController {
       @RequestHeader("Monew-Request-User-ID") UUID userId,
       @Valid @ModelAttribute InterestSearchRequest request) {
     return interestService.searchInterest(userId, request);
+  }
+
+  @Operation(summary = "관심사 물리 삭제", description = "관심사를 물리적으로 삭제합니다.", operationId = "hardDelete")
+  @DeleteMapping("/{interestId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteInterest(@PathVariable UUID interestId) {
+    interestService.deleteInterest(interestId);
   }
 }
