@@ -15,9 +15,11 @@ import com.codeit.monew.domain.article.repository.ArticleRepository;
 import com.codeit.monew.domain.comment.dto.CommentDto;
 import com.codeit.monew.domain.comment.dto.CommentOrderBy;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
+import com.codeit.monew.domain.comment.dto.CommentUpdateRequest;
 import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
 import com.codeit.monew.domain.comment.dto.SortDirection;
 import com.codeit.monew.domain.comment.entity.Comment;
+import com.codeit.monew.domain.comment.exception.CommentErrorCode;
 import com.codeit.monew.domain.comment.exception.CommentException;
 import com.codeit.monew.domain.comment.repository.CommentRepository;
 import com.codeit.monew.domain.user.entity.User;
@@ -322,6 +324,60 @@ public class CommentServiceTest {
       assertThat(result.hasNext()).isFalse();
       then(commentRepository).should()
           .findByArticleIdAfterCursorLikeCountDesc(eq(articleId), anyInt(), any(LocalDateTime.class), eq(limit + 1));
+    }
+  }
+
+  @Nested
+  @DisplayName("updateComment")
+  class UpdateComment {
+
+    @Test
+    @DisplayName("유효한 요청일 경우 댓글을 수정하고 CommentDto를 반환")
+    void updateComment_ValidRequest_UpdateAndReturnsDto() {
+      String commentId = UUID.randomUUID().toString();
+      CommentUpdateRequest request = new CommentUpdateRequest("updateTest");
+
+      Comment comment = Comment.create(article, user, "test");
+
+      given(commentRepository.findById(UUID.fromString(commentId))).willReturn(Optional.of(comment));
+      given(user.getId()).willReturn(userId);
+      given(user.getNickname()).willReturn("tester");
+      given(article.getId()).willReturn(articleId);
+
+      CommentDto result = commentService.updateComment(commentId, userId.toString(), request);
+
+      assertThat(result.content()).isEqualTo("updateTest");
+      assertThat(result.userNickname()).isEqualTo("tester");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 commentId이면 CommentException을 던짐")
+    void updateComment_CommentNotFound_ThrowsCommentException() {
+      String commentId = UUID.randomUUID().toString();
+      CommentUpdateRequest request = new CommentUpdateRequest("updateTest");
+
+      given(commentRepository.findById(UUID.fromString(commentId))).willReturn(Optional.empty());
+
+      assertThatThrownBy(() -> commentService.updateComment(commentId, userId.toString(), request))
+          .isInstanceOf(CommentException.class);
+    }
+
+    @Test
+    @DisplayName("댓글 작성자가 아닐 경우 CommentException을 던짐")
+    void updateComment_IsNotCommentOwner_ThrowsCommentException() {
+      String commentId = UUID.randomUUID().toString();
+      String otherUserId = UUID.randomUUID().toString();
+      CommentUpdateRequest request = new CommentUpdateRequest("updateTest");
+
+      Comment comment = Comment.create(article, user, "test");
+
+      given(commentRepository.findById(UUID.fromString(commentId))).willReturn(Optional.of(comment));
+      given(user.getId()).willReturn(userId);
+
+      assertThatThrownBy(() -> commentService.updateComment(commentId, otherUserId, request))
+          .isInstanceOf(CommentException.class)
+          .extracting("errorCode")
+          .isEqualTo(CommentErrorCode.COMMENT_UNAUTHORIZED);
     }
   }
 }

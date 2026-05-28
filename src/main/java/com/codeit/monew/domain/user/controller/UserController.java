@@ -49,7 +49,7 @@ public class UserController {
     @ResponseStatus(HttpStatus.OK)
     public UserDto updateUser(
             @PathVariable UUID userId,
-            @RequestHeader(value = "MoNew-Request-User-ID", required = false) String requestUserId,
+            @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId,
             @Valid @RequestBody UserUpdateRequest request
     ) {
         log.info("사용자 정보 수정 요청 시작. UserId: {}", userId);
