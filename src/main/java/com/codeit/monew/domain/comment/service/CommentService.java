@@ -115,6 +115,11 @@ public class CommentService {
   public CommentDto updateComment(String commentId, String userId, CommentUpdateRequest request) {
     UUID commentUUID;
     UUID userUUID;
+
+    if(userId == null || userId.isBlank()) {
+      throw new CommentException(CommentErrorCode.MISSING_USER_ID);
+    }
+
     try {
       commentUUID = UUID.fromString(commentId);
       userUUID = UUID.fromString(userId);
