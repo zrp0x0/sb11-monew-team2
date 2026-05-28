@@ -227,7 +227,7 @@ public class InterestServiceTest {
   }
 
   @Test
-  @DisplayName("관심사 목록 조회 실패 - 존재하지 않는 유저")
+  @DisplayName("관심사 목록 조회 실패 - 존재하지 않는 유저일 시 INVALID_CREDENTIALS 예외 발생")
   void searchInterest_fail_user_not_found() {
     //given
     UUID userId = UUID.randomUUID();
