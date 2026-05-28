@@ -5,6 +5,7 @@ import com.codeit.monew.domain.article.repository.ArticleRepository;
 import com.codeit.monew.domain.comment.dto.CommentDto;
 import com.codeit.monew.domain.comment.dto.CommentOrderBy;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
+import com.codeit.monew.domain.comment.dto.CommentUpdateRequest;
 import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
 import com.codeit.monew.domain.comment.dto.SortDirection;
 import com.codeit.monew.domain.comment.entity.Comment;
@@ -108,5 +109,34 @@ public class CommentService {
         .toList();
 
     return CursorPageResponseCommentDto.of(dtos, limit, totalElements, orderBy);
+  }
+
+  @Transactional
+  public CommentDto updateComment(String commentId, String userId, CommentUpdateRequest request) {
+    UUID commentUUID;
+    UUID userUUID;
+
+    if(userId == null || userId.isBlank()) {
+      throw new CommentException(CommentErrorCode.MISSING_USER_ID);
+    }
+
+    try {
+      commentUUID = UUID.fromString(commentId);
+      userUUID = UUID.fromString(userId);
+    } catch (IllegalArgumentException e) {
+      throw new CommentException(CommentErrorCode.INVALID_UUID_FORMAT);
+    }
+    Comment comment = commentRepository.findById(commentUUID)
+        .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
+
+    if(!comment.getUser().getId().equals(userUUID)) {
+      throw new CommentException(CommentErrorCode.COMMENT_UNAUTHORIZED);
+    }
+
+    comment.update(request.content());
+
+    log.info("댓글 수정 성공. CommentId: {}, UserId: {}", commentUUID, userUUID);
+
+    return CommentDto.of(comment, comment.getUser().getNickname(), false);
   }
 }
