@@ -60,8 +60,8 @@ public class CommentController {
   @ResponseStatus(HttpStatus.OK)
   @PatchMapping("/{commentId}")
   public CommentDto updateComment(
-      @PathVariable String commentId,
-      @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId,
+      @PathVariable UUID commentId,
+      @RequestHeader("Monew-Request-User-ID") UUID requestUserId,
       @Valid @RequestBody CommentUpdateRequest request
   ) {
     return commentService.updateComment(commentId, requestUserId, request);
