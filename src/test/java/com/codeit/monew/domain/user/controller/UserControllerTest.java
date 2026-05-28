@@ -201,7 +201,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
-                        .header("MoNew-Request-User-ID", userId.toString())
+                        .header("Monew-Request-User-ID", userId.toString())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -224,7 +224,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
-                        .header("MoNew-Request-User-ID", userId.toString())
+                        .header("Monew-Request-User-ID", userId.toString())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -267,7 +267,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
-                        .header("MoNew-Request-User-ID", requestUserId.toString())
+                        .header("Monew-Request-User-ID", requestUserId.toString())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden())
@@ -288,7 +288,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
-                        .header("MoNew-Request-User-ID", userId.toString())
+                        .header("Monew-Request-User-ID", userId.toString())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
