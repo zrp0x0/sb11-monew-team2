@@ -7,6 +7,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
@@ -241,6 +244,43 @@ public class InterestServiceTest {
         .isInstanceOf(UserException.class)
         .extracting("errorCode")
         .isEqualTo(UserErrorCode.INVALID_CREDENTIALS);
+  }
+
+  @Test
+  @DisplayName("관심사 삭제 성공")
+  void deleteInterest_success() {
+    //given
+    UUID interestId = UUID.randomUUID();
+    Interest interest = createMockInterest(interestId, "테스트", 10L);
+
+    given(interestRepository.existsById(interestId))
+        .willReturn(true);
+
+    //when
+    assertDoesNotThrow(() -> interestService.deleteInterest(interestId));
+
+    //then
+    verify(subscriptionRepository, times(1)).deleteByInterestId(interestId);
+    verify(interestRepository, times(1)).deleteById(interestId);
+  }
+
+  @Test
+  @DisplayName("관심사 삭제 실패 - 존재하지 않는 관심사 ID일 시 INTEREST_NOT_FOUND 예외 발생")
+  void deleteInterest_fail_not_found() {
+    //given
+    UUID interestId = UUID.randomUUID();
+
+    given(interestRepository.existsById(interestId))
+        .willReturn(false);
+
+    //when&then
+    assertThatThrownBy(() -> interestService.deleteInterest(interestId))
+        .isInstanceOf(InterestException.class)
+        .extracting("errorCode")
+        .isEqualTo(InterestErrorCode.INTEREST_NOT_FOUND);
+
+    verify(subscriptionRepository, never()).deleteByInterestId(any());
+    verify(interestRepository, never()).deleteById(any());
   }
 
   // 엔티티 생성 헬퍼 메서드
