@@ -251,7 +251,6 @@ public class InterestServiceTest {
   void deleteInterest_success() {
     //given
     UUID interestId = UUID.randomUUID();
-    Interest interest = createMockInterest(interestId, "테스트", 10L);
 
     given(interestRepository.existsById(interestId))
         .willReturn(true);
