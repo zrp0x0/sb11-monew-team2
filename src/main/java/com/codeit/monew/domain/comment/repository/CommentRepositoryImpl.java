@@ -35,20 +35,20 @@ public class CommentRepositoryImpl implements  CommentRepositoryCustom {
     if(orderBy == CommentOrderBy.createdAt && cursorCreatedAt != null && cursorId != null) {
       where.and(
           comment.createdAt.lt(cursorCreatedAt)
-              .or(comment.createdAt.eq(cursorCreatedAt))
-              .and(comment.id.lt(cursorId))
+              .or(comment.createdAt.eq(cursorCreatedAt)
+              .and(comment.id.lt(cursorId)))
       );
     } else if (orderBy == CommentOrderBy.likeCount && cursorLikeCount != null && cursorCreatedAt != null) {
       where.and(
           comment.likeCounts.lt(cursorLikeCount)
-              .or(comment.likeCounts.eq(cursorLikeCount))
-              .and(comment.createdAt.lt(cursorCreatedAt))
+              .or(comment.likeCounts.eq(cursorLikeCount)
+              .and(comment.createdAt.lt(cursorCreatedAt)))
       );
     }
 
     OrderSpecifier<?>[] orderBy_ = (orderBy == CommentOrderBy.createdAt)
         ? new OrderSpecifier[]{comment.createdAt.desc(), comment.id.desc()}
-        : new OrderSpecifier[]{comment.likeCounts.desc(), comment.id.desc()};
+        : new OrderSpecifier[]{comment.likeCounts.desc(), comment.createdAt.desc()};
 
     return queryFactory
         .selectFrom(comment)
