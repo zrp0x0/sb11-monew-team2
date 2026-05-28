@@ -255,12 +255,7 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.code").value("ARTICLE_NOT_FOUND"));
     }
 
-    private ObjectMapper objectMapper() {
-        return new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-    }
-}
+    @Test
     @DisplayName("뉴스 기사 단건 조회에 성공한다")
     void getArticle_success() throws Exception {
         // given
@@ -296,5 +291,11 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.viewedByMe").value(false));
 
         verify(articleService).getArticle(articleId, requestUserId.toString());
+    }
+
+    private ObjectMapper objectMapper() {
+        return new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 }

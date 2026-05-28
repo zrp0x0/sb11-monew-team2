@@ -65,7 +65,7 @@ public class ArticleService {
 
     @Transactional
     public ArticleViewDto registerArticleView(UUID articleId, String requestUserIdHeader) {
-        UUID requestUserId = parseRequestUserId(requestUserIdHeader);
+        UUID requestUserId = parseArticleViewRequestUserId(requestUserIdHeader);
         User user = userRepository.findById(requestUserId)
                 .orElseThrow(() -> new UserException(UserErrorCode.INVALID_CREDENTIALS));
         Article article = articleRepository.findById(articleId)
@@ -80,7 +80,7 @@ public class ArticleService {
                 });
     }
 
-    private UUID parseRequestUserId(String requestUserIdHeader) {
+    private UUID parseArticleViewRequestUserId(String requestUserIdHeader) {
         if (!StringUtils.hasText(requestUserIdHeader)) {
             throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
         }
@@ -151,11 +151,10 @@ public class ArticleService {
                 Map.of(field, String.valueOf(value))
         );
     }
-}
 
     @Transactional(readOnly = true)
     public ArticleDto getArticle(UUID articleId, String requestUserId) {
-        UUID parsedRequestUserId = parseRequestUserId(requestUserId);
+        parseArticleRequestUserId(requestUserId);
 
         Article article = articleRepository.findByIdAndDeletedAtIsNull(articleId)
                 .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
@@ -164,7 +163,7 @@ public class ArticleService {
         return ArticleDto.from(article, false);
     }
 
-    private UUID parseRequestUserId(String requestUserId) {
+    private UUID parseArticleRequestUserId(String requestUserId) {
         if (!StringUtils.hasText(requestUserId)) {
             throw new ArticleException(ArticleErrorCode.REQUEST_USER_ID_REQUIRED);
         }
