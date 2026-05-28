@@ -4,15 +4,19 @@ import static com.codeit.monew.domain.interest.entity.QInterest.interest;
 
 import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
 import com.codeit.monew.domain.interest.entity.Interest;
+import com.codeit.monew.domain.interest.exception.InterestErrorCode;
+import com.codeit.monew.domain.interest.exception.InterestException;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
-public class InterestRepositoryImpl implements InterestRepositoryCustom{
+public class InterestRepositoryImpl implements InterestRepositoryCustom {
 
   private final JPAQueryFactory jpaQueryFactory;
 
@@ -26,7 +30,8 @@ public class InterestRepositoryImpl implements InterestRepositoryCustom{
         )
         .orderBy(
             dynamicOrder(request),
-            interest.createdAt.desc() // 동점자 발생 시 최신순으로 정렬
+            interest.createdAt.desc(), // 동점자 발생 시 최신순으로 정렬
+            interest.id.asc() // 생성일시까지 같을 경우 ID순으로 정렬
         )
         .limit(request.getLimit() + 1)
         .fetch();
@@ -64,20 +69,41 @@ public class InterestRepositoryImpl implements InterestRepositoryCustom{
 
     // 구독자 수 기준 정렬일 때
     if (request.getOrderBy().equals("subscriberCount")) {
-      long cursorCount = Long.parseLong(cursor); // 커서를 숫자로 변환
+      // 타이 브레이커를 위해 '_'로 합쳤던 cursor와 lastInterestId를 분리
+      String[] parts = cursor.split("_");
+
+      if (parts.length != 2) {
+        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT,
+            Map.of("cursor", cursor));
+      }
+
+      long cursorCount;
+      UUID cursorId;
+      try {
+        cursorCount = Long.parseLong(parts[0]);
+        cursorId = UUID.fromString(parts[1]);
+      } catch (IllegalArgumentException e) {
+        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT,
+            Map.of("cursor", cursor));
+      }
 
       if (isDesc) {
         return interest.subscriberCount.lt(cursorCount)
-            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.lt(after)));
+            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.lt(after)))
+            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(after))
+                .and(interest.id.gt(cursorId)));
       }
+
       return interest.subscriberCount.gt(cursorCount)
-          .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.lt(after)));
+          .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.lt(after)))
+          .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(after))
+              .and(interest.id.gt(cursorId)));
     }
 
     // 이름 기준 정렬일 때
     if (isDesc) {
       return interest.name.lt(cursor);
-    } else{
+    } else {
       return interest.name.gt(cursor);
     }
   }

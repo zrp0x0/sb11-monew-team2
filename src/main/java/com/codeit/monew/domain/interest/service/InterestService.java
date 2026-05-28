@@ -103,7 +103,7 @@ public class InterestService {
     Interest lastInterest = interestList.get(interestList.size() - 1);
 
     String nextCursor = request.getOrderBy().equals("subscriberCount")
-        ? String.valueOf(lastInterest.getSubscriberCount())
+        ? lastInterest.getSubscriberCount() + "_" + lastInterest.getId()
         : lastInterest.getName();
 
     String nextAfter = hasNext ? String.valueOf(lastInterest.getCreatedAt()) : null;
