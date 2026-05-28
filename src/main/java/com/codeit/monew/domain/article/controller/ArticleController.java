@@ -74,7 +74,7 @@ public class ArticleController {
     @GetMapping("/{articleId}")
     public ArticleDto getArticle(
             @PathVariable UUID articleId,
-            @RequestHeader("Monew-Request-User-Id") UUID requestUserId
+            @RequestHeader(value = "Monew-Request-User-Id", required = false) String requestUserId
     ) {
         log.info("뉴스 기사 단건 조회 요청. articleId: {}, requestUserId: {}", articleId, requestUserId);
         return articleService.getArticle(articleId, requestUserId);

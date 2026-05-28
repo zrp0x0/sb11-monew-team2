@@ -278,13 +278,14 @@ class ArticleServiceTest {
                 .thenReturn(Optional.of(article));
 
         // when
-        ArticleDto response = articleService.getArticle(articleId, requestUserId);
+        ArticleDto response = articleService.getArticle(articleId, requestUserId.toString());
 
         // then
         assertThat(response.source()).isEqualTo(ArticleSource.NAVER);
         assertThat(response.sourceUrl()).isEqualTo("https://news.naver.com/sample");
         assertThat(response.title()).isEqualTo("테스트 기사 제목");
         assertThat(response.summary()).isEqualTo("테스트 기사 본문");
+        assertThat(response.publishDate()).isEqualTo(LocalDateTime.of(2026, 5, 27, 10, 30));
         assertThat(response.commentCount()).isEqualTo(0L);
         assertThat(response.viewCount()).isEqualTo(0L);
         assertThat(response.viewedByMe()).isFalse();
@@ -303,9 +304,35 @@ class ArticleServiceTest {
                 .thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> articleService.getArticle(articleId, requestUserId))
+        assertThatThrownBy(() -> articleService.getArticle(articleId, requestUserId.toString()))
                 .isInstanceOf(ArticleException.class);
 
         verify(articleRepository).findByIdAndDeletedAtIsNull(articleId);
+    }
+
+    @Test
+    @DisplayName("뉴스 기사 단건 조회 시 요청자 ID 헤더가 없으면 예외 발생")
+    void getArticle_missingRequestUserId() {
+        // given
+        UUID articleId = UUID.randomUUID();
+
+        // when & then
+        assertThatThrownBy(() -> articleService.getArticle(articleId, null))
+                .isInstanceOf(ArticleException.class);
+
+        verifyNoInteractions(articleRepository);
+    }
+
+    @Test
+    @DisplayName("뉴스 기사 단건 조회 시 요청자 ID 형식이 올바르지 않으면 예외 발생")
+    void getArticle_invalidRequestUserid() {
+        // given
+        UUID articleId = UUID.randomUUID();
+
+        // when & then
+        assertThatThrownBy(() -> articleService.getArticle(articleId, "invalid-user-id"))
+                .isInstanceOf(ArticleException.class);
+
+        verifyNoInteractions(articleRepository);
     }
 }

@@ -143,7 +143,7 @@ class ArticleControllerTest {
                 false
         );
 
-        when(articleService.getArticle(articleId, requestUserId))
+        when(articleService.getArticle(articleId, requestUserId.toString()))
                 .thenReturn(articleDto);
 
         // when & then
@@ -159,6 +159,6 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.viewCount").value(10))
                 .andExpect(jsonPath("$.viewedByMe").value(false));
 
-        verify(articleService).getArticle(articleId, requestUserId);
+        verify(articleService).getArticle(articleId, requestUserId.toString());
     }
 }
