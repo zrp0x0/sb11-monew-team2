@@ -12,11 +12,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
@@ -72,5 +68,15 @@ public class ArticleController {
                 requestUserId, orderBy, direction, limit);
 
         return articleService.searchArticles(request);
+    }
+
+    @Operation(summary = "뉴스 기사 단건 조회", description = "뉴스 기사 ID로 뉴스 기사 단건을 조회합니다.")
+    @GetMapping("/{articleId}")
+    public ArticleDto getArticle(
+            @PathVariable UUID articleId,
+            @RequestHeader(value = "Monew-Request-User-Id", required = false) String requestUserId
+    ) {
+        log.info("뉴스 기사 단건 조회 요청. articleId: {}, requestUserId: {}", articleId, requestUserId);
+        return articleService.getArticle(articleId, requestUserId);
     }
 }
