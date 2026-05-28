@@ -68,7 +68,7 @@ public class ArticleService {
         UUID requestUserId = parseArticleViewRequestUserId(requestUserIdHeader);
         User user = userRepository.findById(requestUserId)
                 .orElseThrow(() -> new UserException(UserErrorCode.INVALID_CREDENTIALS));
-        Article article = articleRepository.findById(articleId)
+        Article article = articleRepository.findByIdAndDeletedAtIsNull(articleId)
                 .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
 
         return articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId)
