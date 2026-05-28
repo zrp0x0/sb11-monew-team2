@@ -73,4 +73,8 @@ public class Article extends BaseSoftDeleteEntity {
   ) {
     return new Article(source, sourceUrl, title, summary, publishedAt);
   }
+
+  public void increaseViewCount() {
+    this.viewCount++;
+  }
 }
