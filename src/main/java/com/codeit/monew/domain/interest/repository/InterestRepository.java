@@ -8,7 +8,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface InterestRepository extends JpaRepository<Interest, UUID> {
+public interface InterestRepository extends JpaRepository<Interest, UUID>, InterestRepositoryCustom {
 
   boolean existsByName(String name);
 
