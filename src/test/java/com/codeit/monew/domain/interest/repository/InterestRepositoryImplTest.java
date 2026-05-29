@@ -251,7 +251,7 @@ public class InterestRepositoryImplTest {
     tem.flush(); tem.clear();
 
     InterestSearchRequest firstRequest = new InterestSearchRequest(
-        null, "name", "ACS", "가", LocalDateTime.now(), 1
+        null, "name", "ASC", "가", LocalDateTime.now(), 1
     );
 
     List<Interest> firstPage = interestRepository.findAllByCondition(firstRequest);
@@ -263,7 +263,7 @@ public class InterestRepositoryImplTest {
     String nextCursor = firstPage.get(1).getName();
 
     InterestSearchRequest secondRequest = new InterestSearchRequest(
-        null, "name", "ACS", nextCursor, LocalDateTime.now(), 1
+        null, "name", "ASC", nextCursor, LocalDateTime.now(), 1
     );
 
     //when

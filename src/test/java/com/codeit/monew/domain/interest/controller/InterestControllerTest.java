@@ -143,7 +143,7 @@ public class InterestControllerTest {
 
     mockMvc.perform(
         get("/api/interests")
-            .header("User-Id", userId.toString())
+            .header("Monew-Request-User-ID", userId.toString())
             .param("cursor", "잘못된데이터")
     )
         .andExpect(status().isBadRequest());
