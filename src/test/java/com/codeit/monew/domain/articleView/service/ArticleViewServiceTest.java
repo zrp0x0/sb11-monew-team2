@@ -61,7 +61,7 @@ class ArticleViewServiceTest {
         Article article = createArticle(articleId, publishedAt);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(articleRepository.findByIdAndDeletedAtIsNull(articleId)).thenReturn(Optional.of(article));
+        when(articleRepository.findById(articleId)).thenReturn(Optional.of(article));
         when(articleViewRepository.findByUserIdAndArticleId(userId, articleId)).thenReturn(Optional.empty());
         when(articleViewRepository.save(any(ArticleView.class))).thenAnswer(invocation -> {
             ArticleView articleView = invocation.getArgument(0);
@@ -108,7 +108,7 @@ class ArticleViewServiceTest {
         ArticleView articleView = createArticleView(articleViewId, viewedAt, user, article);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(articleRepository.findByIdAndDeletedAtIsNull(articleId)).thenReturn(Optional.of(article));
+        when(articleRepository.findById(articleId)).thenReturn(Optional.of(article));
         when(articleViewRepository.findByUserIdAndArticleId(userId, articleId)).thenReturn(Optional.of(articleView));
 
         // when
@@ -170,7 +170,7 @@ class ArticleViewServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(UserErrorCode.INVALID_CREDENTIALS);
 
-        verify(articleRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
+        verify(articleRepository, never()).findById(any(UUID.class));
         verify(articleViewRepository, never()).findByUserIdAndArticleId(any(UUID.class), any(UUID.class));
         verify(articleViewRepository, never()).save(any(ArticleView.class));
     }
@@ -184,7 +184,7 @@ class ArticleViewServiceTest {
         User user = createUser(userId);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(articleRepository.findByIdAndDeletedAtIsNull(articleId)).thenReturn(Optional.empty());
+        when(articleRepository.findById(articleId)).thenReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> articleService.registerArticleView(articleId, userId.toString()))
@@ -205,7 +205,7 @@ class ArticleViewServiceTest {
         User user = createUser(userId);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(articleRepository.findByIdAndDeletedAtIsNull(articleId)).thenReturn(Optional.empty());
+        when(articleRepository.findById(articleId)).thenReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> articleService.registerArticleView(articleId, userId.toString()))
