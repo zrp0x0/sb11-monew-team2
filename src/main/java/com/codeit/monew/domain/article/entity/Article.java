@@ -75,6 +75,10 @@ public class Article extends BaseSoftDeleteEntity {
   }
 
   public void increaseViewCount() {
+    if (this.viewCount == Long.MAX_VALUE) {
+      return;
+    }
+
     this.viewCount++;
   }
 }
