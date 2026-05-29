@@ -1,18 +1,23 @@
 package com.codeit.monew.domain.interest.controller;
 
 import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
+import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestUpdateRequest;
 import com.codeit.monew.domain.interest.dto.response.InterestResponse;
 import com.codeit.monew.domain.interest.service.InterestService;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,15 +34,22 @@ public class InterestController {
   @ResponseStatus(HttpStatus.CREATED)
   public InterestResponse register(
       @Valid @RequestBody InterestRegisterRequest request) {
-    return interestService.create(request);
+    return interestService.createInterest(request);
   }
 
   @Operation(summary = "관심사 정보 수정", description = "관심사의 키워드를 수정합니다.", operationId = "update_1")
   @PatchMapping("/{interestId}")
-  @ResponseStatus(HttpStatus.OK)
   public InterestResponse update(
       @PathVariable UUID interestId,
       @Valid @RequestBody InterestUpdateRequest request) {
-    return interestService.update(interestId, request);
+    return interestService.updateInterest(interestId, request);
+  }
+
+  @Operation(summary = "관심사 목록 조회", description = "조건에 맞는 관심사 목록을 조회합니다.", operationId = "search")
+  @GetMapping()
+  public CursorPageResponse<InterestResponse> search(
+      @RequestHeader("Monew-Request-User-ID") UUID userId,
+      @Valid @ModelAttribute InterestSearchRequest request) {
+    return interestService.searchInterest(userId, request);
   }
 }
