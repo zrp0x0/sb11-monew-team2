@@ -66,6 +66,19 @@ public class InterestService {
     return InterestResponse.from(interest);
   }
 
+  @Transactional
+  public void deleteInterest(UUID interestId) {
+    log.debug("interest delete 시작 - 입력값: {}", interestId);
+    if(!interestRepository.existsById(interestId)) {
+      throw new InterestException(InterestErrorCode.INTEREST_NOT_FOUND, Map.of("interestId", interestId));
+    }
+
+    // TODO: 관심사와 연관된 코드(알림, 기사)가 구현될 시 함께 삭제 예정
+    subscriptionRepository.deleteByInterestId(interestId);
+    interestRepository.deleteById(interestId);
+    log.info("interest delete - interestId: {}", interestId);
+  }
+
   @Transactional(readOnly = true)
   public CursorPageResponse<InterestResponse> searchInterest(UUID userId,
       InterestSearchRequest request) {
@@ -103,7 +116,7 @@ public class InterestService {
     Interest lastInterest = interestList.get(interestList.size() - 1);
 
     String nextCursor = request.getOrderBy().equals("subscriberCount")
-        ? String.valueOf(lastInterest.getSubscriberCount())
+        ? lastInterest.getSubscriberCount() + "_" + lastInterest.getId()
         : lastInterest.getName();
 
     String nextAfter = hasNext ? String.valueOf(lastInterest.getCreatedAt()) : null;
