@@ -33,8 +33,6 @@ public class InterestService {
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
 
-  private static final int LENGTH_MARGIN = 2; // +- 2글자까지만 비교 허용
-
   @Transactional
   public InterestResponse createInterest(InterestRegisterRequest request) {
     log.debug("interest register 시작 - 입력값: {}", request);
@@ -135,8 +133,14 @@ public class InterestService {
   // Levenshtein 알고리즘을 활용한 유사도 검증 헬퍼 메서드
   private void checkOptimizedSimilarity(String newName) {
     int len = newName.length();
-    int minLength = Math.max(1, len - LENGTH_MARGIN);
-    int maxLength = len + LENGTH_MARGIN;
+    double threshold = 0.8;
+
+    // 80% 유사도를 만족할 수 있는 길이 동적 계산 로직 적용
+    int calculatedMin = (int) Math.ceil(len * threshold);
+    int calculatedMax = (int) Math.floor(len / threshold);
+
+    int minLength = Math.max(1, calculatedMin - 1);
+    int maxLength = Math.min(20, calculatedMax + 1);
 
     List<Interest> candidates = interestRepository.findSimilarLengthInterests(minLength, maxLength);
 
@@ -158,8 +162,6 @@ public class InterestService {
       int maxLen = Math.max(decomposedNewName.length(), decomposedExistingName.length());
 
       double similarity = 1.0 - ((double) distance / maxLen);
-
-      double threshold = 0.8;
 
       if (similarity >= threshold) {
         log.warn("유사도 충돌 - 요청: {}, 기존: {}, 임계값: {}, 유사도: {}", newName, existingName, threshold,
