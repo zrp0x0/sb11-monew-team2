@@ -1,6 +1,7 @@
 package com.codeit.monew.domain.commentLike.repository;
 
 import com.codeit.monew.domain.commentLike.entity.CommentLike;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
@@ -8,4 +9,6 @@ import java.util.UUID;
 
 public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> {
     Optional<CommentLike> findByCommentIdAndUserId(UUID commentId, UUID userId);
+
+    List<CommentLike> findByUserIdAndCommentIdIn(UUID userId, List<UUID> commentIds);
 }
