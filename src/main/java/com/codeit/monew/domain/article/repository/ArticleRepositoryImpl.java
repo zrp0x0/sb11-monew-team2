@@ -195,22 +195,22 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
         ParsedCursor parsedCursor = parseCursor(request.cursor());
         boolean ascending = isAscending(request.direction());
 
-        try{
+        try {
             return switch (request.orderBy()) {
                 case "publishDate" -> publishDateCursorCondition(
-                        LocalDateTime.parse(request.cursor()),
+                        LocalDateTime.parse(parsedCursor.value()),
                         request.after(),
                         parsedCursor.articleId(),
                         ascending
                 );
                 case "commentCount" -> commentCountCursorCondition(
-                        Long.valueOf(request.cursor()),
+                        Long.valueOf(parsedCursor.value()),
                         request.after(),
                         parsedCursor.articleId(),
                         ascending
                 );
                 case "viewCount" -> viewCountCursorCondition(
-                        Long.valueOf(request.cursor()),
+                        Long.valueOf(parsedCursor.value()),
                         request.after(),
                         parsedCursor.articleId(),
                         ascending
