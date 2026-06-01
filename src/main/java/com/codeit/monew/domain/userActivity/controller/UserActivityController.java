@@ -20,7 +20,7 @@ public class UserActivityController {
 
     private final UserActivityService userActivityService;
 
-    @Operation(summary = "사용자 활동 내역 조회", description = "인증된 사용자의 활동 내역을 조회합니다.")
+    @Operation(summary = "사용자 활동 내역 조회", description = "사용자 ID로 활동 내역을 조회합니다.")
     @GetMapping("/{userId}")
     public UserActivityDto getUserActivity(
             @PathVariable UUID userId,
