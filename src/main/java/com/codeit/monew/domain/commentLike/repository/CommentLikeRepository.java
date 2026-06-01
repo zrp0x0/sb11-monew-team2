@@ -14,4 +14,8 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
 
     @Query("SELECT cl.comment.id FROM CommentLike cl WHERE cl.user.id = :userId AND cl.comment.id IN :commentIds")
     List<UUID> findByUserIdAndCommentIdIn(@Param("userId") UUID userId, @Param("commentIds") List<UUID> commentIds);
+
+    void deleteAllByCommentId(UUID commentId);
+
+    void deleteAllByCommentIdIn(List<UUID> commentIds);
 }
