@@ -12,10 +12,13 @@ import com.codeit.monew.domain.comment.entity.Comment;
 import com.codeit.monew.domain.comment.exception.CommentErrorCode;
 import com.codeit.monew.domain.comment.exception.CommentException;
 import com.codeit.monew.domain.comment.repository.CommentRepository;
+import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.repository.UserRepository;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +33,7 @@ public class CommentService {
   private final CommentRepository commentRepository;
   private final ArticleRepository articleRepository;
   private final UserRepository userRepository;
+  private final CommentLikeRepository commentLikeRepository;
 
   @Transactional
   public CommentDto createComment(CommentRegisterRequest request) {
@@ -96,9 +100,16 @@ public class CommentService {
         articleId, orderBy, after, cursorId, cursorLikeCount, queryLimit
     );
 
+    List<UUID> commentIds = comments.stream()
+        .map(Comment::getId)
+        .toList();
+
+    Set<UUID> likedSet = new HashSet<>(
+        commentLikeRepository.findByUserIdAndCommentIdIn(requestUserId, commentIds)
+    );
+
     List<CommentDto> dtos = comments.stream()
-        // TODO: CommentLike 구현 후 requestUserId 기반으로 likedByMe 여부 조회로 교체
-        .map(c -> CommentDto.of(c, c.getUser().getNickname(), false))
+        .map(c -> CommentDto.of(c, c.getUser().getNickname(), likedSet.contains(c.getId())))
         .toList();
 
     return CursorPageResponseCommentDto.of(dtos, limit, totalElements, orderBy);
@@ -117,6 +128,10 @@ public class CommentService {
 
     log.info("댓글 수정 성공. CommentId: {}, UserId: {}", commentId, userId);
 
-    return CommentDto.of(comment, comment.getUser().getNickname(), false);
+    boolean likedByMe = commentLikeRepository
+        .findByCommentIdAndUserId(commentId, userId)
+        .isPresent();
+
+    return CommentDto.of(comment, comment.getUser().getNickname(), likedByMe);
   }
 }
