@@ -72,14 +72,9 @@ public class ArticleCollectService {
         Set<String> seenUrls = new HashSet<>();
 
         List<Article> articles = response.items().stream()
-                .filter(item -> {
-                    String sourceUrl = resolveSourceUrl(item);
-                    return sourceUrl != null
-                            && !existingUrls.contains(sourceUrl)
-                            && seenUrls.add(sourceUrl);
-                })
                 .map(item -> toArticle(item, existingUrls))
                 .flatMap(Optional::stream)
+                .filter(article -> seenUrls.add(article.getSourceUrl()))
                 .toList();
 
         articleRepository.saveAll(articles);
