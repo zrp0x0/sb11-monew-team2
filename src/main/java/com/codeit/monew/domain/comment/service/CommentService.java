@@ -16,10 +16,10 @@ import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.repository.UserRepository;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -104,9 +104,9 @@ public class CommentService {
         .map(Comment::getId)
         .toList();
 
-    Set<UUID> likedSet = commentLikeRepository.findByUserIdAndCommentIdIn(requestUserId, commentIds).stream()
-        .map(cl -> cl.getComment().getId())
-        .collect(Collectors.toSet());
+    Set<UUID> likedSet = new HashSet<>(
+        commentLikeRepository.findByUserIdAndCommentIdIn(requestUserId, commentIds)
+    );
 
     List<CommentDto> dtos = comments.stream()
         .map(c -> CommentDto.of(c, c.getUser().getNickname(), likedSet.contains(c.getId())))
