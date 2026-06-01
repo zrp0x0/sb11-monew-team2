@@ -19,7 +19,7 @@ public interface CommentLikeApi {
             UUID commentId,
 
             @Parameter(description = "요청자 ID")
-            @RequestHeader("Monew-Request-User_ID")
+            @RequestHeader("Monew-Request-User-ID")
             UUID requestUserId
     );
 
@@ -31,7 +31,7 @@ public interface CommentLikeApi {
             UUID commentId,
 
             @Parameter(description = "요청자 ID")
-            @RequestHeader("Monew-Request-User_ID")
+            @RequestHeader("Monew-Request-User-ID")
             UUID requestUserId
     );
 }
