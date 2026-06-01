@@ -33,14 +33,14 @@ public class InterestController {
   @Operation(summary = "관심사 등록", description = "새로운 관심사를 등록합니다.", operationId = "register_1")
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public InterestResponse register(
+  public InterestResponse registerInterest(
       @Valid @RequestBody InterestRegisterRequest request) {
     return interestService.createInterest(request);
   }
 
   @Operation(summary = "관심사 정보 수정", description = "관심사의 키워드를 수정합니다.", operationId = "update_1")
   @PatchMapping("/{interestId}")
-  public InterestResponse update(
+  public InterestResponse updateInterest(
       @PathVariable UUID interestId,
       @Valid @RequestBody InterestUpdateRequest request) {
     return interestService.updateInterest(interestId, request);
@@ -48,7 +48,7 @@ public class InterestController {
 
   @Operation(summary = "관심사 목록 조회", description = "조건에 맞는 관심사 목록을 조회합니다.", operationId = "search")
   @GetMapping()
-  public CursorPageResponse<InterestResponse> search(
+  public CursorPageResponse<InterestResponse> searchInterest(
       @RequestHeader("Monew-Request-User-ID") UUID userId,
       @Valid @ModelAttribute InterestSearchRequest request) {
     return interestService.searchInterest(userId, request);
