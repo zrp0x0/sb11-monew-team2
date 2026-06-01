@@ -373,14 +373,11 @@ public class CommentServiceTest {
 
       List<Comment> comments = List.of(comment1, comment2);
 
-      CommentLike commentLike = mock(CommentLike.class);
-      given(commentLike.getComment()).willReturn(comment1);
-
       given(commentRepository.countByArticleId(articleId)).willReturn(2L);
       given(commentRepository.findComments(articleId, CommentOrderBy.createdAt, null, null, null, limit + 1))
           .willReturn(comments);
       given(commentLikeRepository.findByUserIdAndCommentIdIn(eq(requestUserId), anyList()))
-          .willReturn(List.of(commentLike)); // comment1만 좋아요
+          .willReturn(List.of(comment1Id)); // comment1만 좋아요
 
       CursorPageResponseCommentDto result = commentService.getComments(
           articleId, null, null, limit, CommentOrderBy.createdAt, SortDirection.DESC, requestUserId
