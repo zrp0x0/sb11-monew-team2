@@ -10,8 +10,11 @@ import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.config.JpaAuditingConfig;
 import com.codeit.monew.global.config.QuerydslConfig;
 import com.codeit.monew.global.dto.CursorPageResponse;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @DataJpaTest
 @Import({QuerydslConfig.class, JpaAuditingConfig.class})
@@ -36,21 +38,41 @@ class NotificationRepositoryTest {
     private User testUser;
     private final List<Notification> savedNotifications = new ArrayList<>();
 
+    @Autowired
+    private EntityManager em; // 👈 추가해 주세요
+
     @BeforeEach
     void setUp() {
         // 테스트용 유저 생성
         testUser = User.create("test@test.com", "tester", "encodedPassword");
         userRepository.save(testUser);
 
-        // 테스트용 알림 5개 생성 (시간순 정렬 테스트를 위해 createdAt을 1분 간격으로 명시적 조작)
-        LocalDateTime baseTime = LocalDateTime.now().minusDays(1);
+        // 시간 정밀도 버그 방지를 위해 초(Second) 단위로 자름
+        LocalDateTime baseTime = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).minusDays(1);
+
+        // 1. 먼저 DB에 저장을 합니다 (이때 Auditing에 의해 현재 시간으로 다 똑같이 저장됨)
         for (int i = 0; i < 5; i++) {
             Notification notification = Notification.create(
                 testUser, "알림 " + (i + 1), NotificationResourceType.ARTICLE, UUID.randomUUID()
             );
-            ReflectionTestUtils.setField(notification, "createdAt", baseTime.plusMinutes(i));
-            savedNotifications.add(notificationRepository.save(notification));
+            notificationRepository.save(notification);
         }
+        notificationRepository.flush();
+
+        // 2. 쿼리를 날려 시간을 1분 간격으로 완벽하게 강제 조작(Auditing 우회)
+        List<Notification> all = notificationRepository.findAll();
+        for (int i = 0; i < all.size(); i++) {
+            em.createQuery("UPDATE Notification n SET n.createdAt = :time WHERE n.id = :id")
+                .setParameter("time", baseTime.plusMinutes(i))
+                .setParameter("id", all.get(i).getId())
+                .executeUpdate();
+        }
+        em.clear(); // 1차 캐시를 비워서 이후 조회 시 DB에서 새 시간을 가져오게 함
+
+        // 3. 검증용 리스트를 완벽한 상태로 다시 채움
+        savedNotifications.clear();
+        savedNotifications.addAll(notificationRepository.findAll());
+        savedNotifications.sort(Comparator.comparing(Notification::getCreatedAt)); // 확실한 오름차순 정렬
     }
 
     @Test
@@ -107,9 +129,18 @@ class NotificationRepositoryTest {
     @DisplayName("마지막 페이지 조회: 남은 데이터 수가 limit 이하일 경우 hasNext는 false를 반환한다.")
     void searchNotifications_lastPage() {
         // given
-        // 총 5개 중 앞의 4개를 건너뛰는 커서 조건 생성
-        LocalDateTime cursor = savedNotifications.get(3).getCreatedAt(); // 알림 4의 시간
-        NotificationSearchCondition condition = new NotificationSearchCondition(cursor, cursor, 2);
+        // 1. 처음 4개를 먼저 조회하여 정확한 커서 값을 얻어냄
+        CursorPageResponse<Notification> previousPage = notificationRepository.searchNotifications(
+            new NotificationSearchCondition(null, null, 4), testUser.getId()
+        );
+
+        // 2. 조회된 결과에서 커서 값을 파싱합니다 (DB에서 읽어온 정확한 문자열 값).
+        LocalDateTime nextCursor = LocalDateTime.parse(previousPage.nextCursor());
+        LocalDateTime nextAfter = LocalDateTime.parse(previousPage.nextAfter());
+
+        // 3. limit을 2로 주더라도 남은 데이터가 1개뿐이므로 1개만 조회
+        NotificationSearchCondition condition = new NotificationSearchCondition(nextCursor,
+            nextAfter, 2);
 
         // when
         CursorPageResponse<Notification> response = notificationRepository.searchNotifications(
