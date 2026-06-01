@@ -24,9 +24,8 @@ public class UserActivityService {
             throw new UserException(UserErrorCode.USER_ACCESS_DENIED);
         }
 
-        if (!userRepository.existsById(userId)) {
-            throw new UserException(UserErrorCode.USER_NOT_FOUND);
-        }
+        userRepository.findById(userId)
+                .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 
         return userActivityReader.read(userId);
     }
