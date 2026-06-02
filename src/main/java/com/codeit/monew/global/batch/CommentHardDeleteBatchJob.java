@@ -29,8 +29,8 @@ public class CommentHardDeleteBatchJob {
     do {
       ids = commentRepository.findIdsByDeletedAtBefore(threshold, 1000);
       if(!ids.isEmpty()) {
-        commentLikeRepository.deleteAllByCommentIdIn(ids);
-        commentRepository.deleteAllByIdInBatch(ids);
+        commentLikeRepository.hardDeleteAllByCommentIdIn(ids);
+        commentRepository.hardDeleteAllByIdIn(ids);
         totalDeleted += ids.size();
       }
     } while (ids.size() == 1000);

@@ -14,6 +14,16 @@ public interface CommentRepository extends JpaRepository<Comment, UUID>, Comment
 
   long countByArticleId(UUID articleId);
 
-  @Query("SELECT c.id FROM Comment c WHERE c.deletedAt < :threshold AND c.isDeleted = true ORDER BY c.deletedAt ASC LIMIT :limit")
+  @Query(value = """
+      SELECT id FROM comments
+      WHERE is_deleted = true
+        AND deleted_at < :threshold
+      ORDER BY deleted_at ASC
+      LIMIT :limit
+      """, nativeQuery = true)
   List<UUID> findIdsByDeletedAtBefore(@Param("threshold") LocalDateTime threshold, @Param("limit") int limit);
+
+  @Modifying(clearAutomatically = true)
+  @Query(value = "DELETE FROM comments WHERE id IN (:ids)", nativeQuery = true)
+  void hardDeleteAllByIdIn(@Param("ids") List<UUID> ids);
 }
