@@ -47,6 +47,8 @@ public class CommentService {
         Comment.create(article, user, request.content())
     );
 
+    article.increaseCommentCount();
+
     log.info("댓글 등록 성공. CommentId: {}, ArticleId: {}, UserId: {}",
         saved.getId(), request.articleId(), request.userId());
 
@@ -145,6 +147,7 @@ public class CommentService {
     }
 
     comment.softDelete();
+    comment.getArticle().decreaseCommentCount();
     log.info("댓글 삭제 성공. CommentId: {}, UserId: {}", commentId, userId);
   }
 

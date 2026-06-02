@@ -97,6 +97,7 @@ public class CommentServiceTest {
       assertThat(result.likedByMe()).isFalse();
       assertThat(result.likeCount()).isZero();
       then(commentRepository).should().save(any(Comment.class));
+      then(article).should().increaseCommentCount();
     }
 
     @Test
@@ -485,11 +486,13 @@ public class CommentServiceTest {
 
       given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
       given(comment.getUser()).willReturn(user);
+      given(comment.getArticle()).willReturn(article);
       given(user.getId()).willReturn(userId);
 
       commentService.deleteComment(commentId, userId);
 
       then(comment).should().softDelete();
+      then(article).should().decreaseCommentCount();
     }
 
     @Test
