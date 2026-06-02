@@ -3,6 +3,8 @@ name: CI Pipeline
 on:
   pull_request:
     branches: [ "main", "develop" ]
+  push:
+    branches: [ "main", "develop" ]
 
 jobs:
   build-and-test:
@@ -40,12 +42,19 @@ jobs:
       - name: 3. gradlew에 실행 권한 부여하기
         run: chmod +x gradlew
 
-      - name: 4. 데이터베이스 연결 및 프로젝트 빌드 및 커버리지 검사하기 (테스트 실행)
+      - name: 4. 데이터베이스 연결 및 프로젝트 빌드, 커버리지 검사, 배포 산출물 생성하기
         # 테스트 실행 후, 80% 룰(jacocoTestCoverageVerification)까지 검사
+        # CD 준비를 위해 bootJar 실행 JAR 생성 여부까지 검증
         env:
-          DB_HOST: localhost
-          DB_PORT: 5433
-          DB_NAME: monew_test
-          DB_USER: user
-          DB_PASSWORD: pass
-        run: ./gradlew test jacocoTestCoverageVerification --no-daemon
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/monew_test
+          SPRING_DATASOURCE_USERNAME: user
+          SPRING_DATASOURCE_PASSWORD: pass
+        run: ./gradlew test jacocoTestCoverageVerification bootJar --no-daemon
+
+      - name: 5. 배포 산출물(JAR) 업로드하기
+        uses: actions/upload-artifact@v4
+        with:
+          name: monew-boot-jar
+          path: build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 7
