@@ -58,7 +58,7 @@ public class RssArticleCollector {
 
                 Article article = articleOptional.get();
 
-                if (articleRepository.existsBySourceUrl(article.getSourceUrl())) {
+                if (articleRepository.existsBySourceUrlIncludingDeleted(article.getSourceUrl())) {
                     skippedCount++;
                     continue;
                 }

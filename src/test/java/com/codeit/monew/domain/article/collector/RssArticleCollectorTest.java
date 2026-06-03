@@ -57,7 +57,7 @@ class RssArticleCollectorTest {
                 """;
 
         mockRssResponse(rssXml);
-        when(articleRepository.existsBySourceUrl("https://www.hankyung.com/article/2026052974211"))
+        when(articleRepository.existsBySourceUrlIncludingDeleted("https://www.hankyung.com/article/2026052974211"))
                 .thenReturn(false);
 
         ArgumentCaptor<Article> articleCaptor = ArgumentCaptor.forClass(Article.class);
@@ -83,7 +83,7 @@ class RssArticleCollectorTest {
     }
 
     @Test
-    @DisplayName("이미 같은 sourceUrl의 기사가 있으면 저장하지 않고 skip한다")
+    @DisplayName("이미 같은 sourceUrl의 기사가 있으면 삭제 여부와 관계 없이 저장하지 않고 skip한다")
     void collect_skipDuplicatedSourceUrl() {
         // given
         String rssXml = """
@@ -100,7 +100,7 @@ class RssArticleCollectorTest {
                 """;
 
         mockRssResponse(rssXml);
-        when(articleRepository.existsBySourceUrl("https://www.hankyung.com/article/2026052974211"))
+        when(articleRepository.existsBySourceUrlIncludingDeleted("https://www.hankyung.com/article/2026052974211"))
                 .thenReturn(true);
 
         // when
@@ -142,7 +142,7 @@ class RssArticleCollectorTest {
         assertThat(result.skippedCount()).isEqualTo(1);
         assertThat(result.failedCount()).isZero();
 
-        verify(articleRepository, never()).existsBySourceUrl(org.mockito.ArgumentMatchers.anyString());
+        verify(articleRepository, never()).existsBySourceUrlIncludingDeleted(org.mockito.ArgumentMatchers.anyString());
         verify(articleRepository, never()).save(org.mockito.ArgumentMatchers.any(Article.class));
     }
 
@@ -164,7 +164,7 @@ class RssArticleCollectorTest {
                 """;
 
         mockRssResponse(rssXml);
-        when(articleRepository.existsBySourceUrl("https://www.hankyung.com/article/2026052974211"))
+        when(articleRepository.existsBySourceUrlIncludingDeleted("https://www.hankyung.com/article/2026052974211"))
                 .thenReturn(false);
 
         ArgumentCaptor<Article> articleCaptor = ArgumentCaptor.forClass(Article.class);
@@ -200,7 +200,7 @@ class RssArticleCollectorTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("한국경제 RSS 호출에 실패했습니다.");
 
-        verify(articleRepository, never()).existsBySourceUrl(org.mockito.ArgumentMatchers.anyString());
+        verify(articleRepository, never()).existsBySourceUrlIncludingDeleted(org.mockito.ArgumentMatchers.anyString());
         verify(articleRepository, never()).save(org.mockito.ArgumentMatchers.any(Article.class));
     }
 
