@@ -209,4 +209,48 @@ class RssArticleCollectorTest {
         when(restTemplate.getForObject(eq(HANKYUNG_RSS_URL), eq(String.class)))
                 .thenReturn(rssXml);
     }
+
+    @Test
+    @DisplayName("이미 인코딩된 query parameter를 이중 인코딩하지 않는다")
+    void collect_doesNotDoubleEncodeRawQueryParameter() {
+        // given
+        String rssXml = """
+            <rss>
+                <channel>
+                    <item>
+                        <title>인코딩 테스트 기사</title>
+                        <link>https://www.hankyung.com/article/2026052974211?keyword=%EC%82%BC%EC%84%B1%20AI&amp;utm_source=naver</link>
+                        <description>인코딩 테스트 기사 요약</description>
+                        <pubDate>Fri, 29 May 2026 10:00:00 +0900</pubDate>
+                    </item>
+                </channel>
+            </rss>
+            """;
+
+        mockRssResponse(rssXml);
+        when(articleRepository.existsBySourceUrlIncludingDeleted(
+                "https://www.hankyung.com/article/2026052974211?keyword=%EC%82%BC%EC%84%B1%20AI"
+        )).thenReturn(false);
+
+        ArgumentCaptor<Article> articleCaptor = ArgumentCaptor.forClass(Article.class);
+
+        // when
+        RssArticleCollector.CollectResult result = rssArticleCollector.collect();
+
+        // then
+        assertThat(result.totalCount()).isEqualTo(1);
+        assertThat(result.savedCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isZero();
+        assertThat(result.failedCount()).isZero();
+
+        verify(articleRepository).save(articleCaptor.capture());
+
+        Article savedArticle = articleCaptor.getValue();
+
+        assertThat(savedArticle.getSourceUrl())
+                .isEqualTo("https://www.hankyung.com/article/2026052974211?keyword=%EC%82%BC%EC%84%B1%20AI");
+        assertThat(savedArticle.getSourceUrl()).doesNotContain("%25EC");
+        assertThat(savedArticle.getSourceUrl()).doesNotContain("%2520");
+    }
 }
+

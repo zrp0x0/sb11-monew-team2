@@ -202,24 +202,58 @@ public class RssArticleCollector {
                 return trimmedUrl;
             }
 
-            String scheme = uri.getScheme() == null ? "http" : uri.getScheme().toLowerCase();
+            String scheme = uri.getScheme() == null ? "https" : uri.getScheme().toLowerCase();
+            String userInfo = uri.getRawUserInfo();
             String host = uri.getHost().toLowerCase();
+            int port = uri.getPort();
             String path = normalizePath(uri.getRawPath());
             String query = normalizeQuery(uri.getRawQuery());
 
-            return new URI(
+            String normalizedUrl = buildNormalizedUrl(
                     scheme,
-                    uri.getUserInfo(),
+                    userInfo,
                     host,
-                    uri.getPort(),
+                    port,
                     path,
-                    query,
-                    null
-            ).toString();
+                    query
+            );
+
+            return new URI(normalizedUrl).toString();
         } catch (URISyntaxException e) {
             log.warn("URL 정규화 실패. 원본 URL 사용. url={}", trimmedUrl);
             return trimmedUrl;
         }
+    }
+
+    private String buildNormalizedUrl(
+            String scheme,
+            String userInfo,
+            String host,
+            int port,
+            String path,
+            String query
+    ) {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append(scheme).append("://");
+
+        if (StringUtils.hasText(userInfo)) {
+            builder.append(userInfo).append("@");
+        }
+
+        builder.append(host);
+
+        if (port != -1) {
+            builder.append(":").append(port);
+        }
+
+        builder.append(path);
+
+        if (StringUtils.hasText(query)) {
+            builder.append("?").append(query);
+        }
+
+        return builder.toString();
     }
 
     private String normalizePath(String path) {
