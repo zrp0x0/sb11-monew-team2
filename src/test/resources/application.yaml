@@ -17,3 +17,8 @@ logging:
   level:
     root: info
     org.hibernate.SQL: debug
+
+batch:
+  comment:
+    hard-delete:
+      batch-size: 10

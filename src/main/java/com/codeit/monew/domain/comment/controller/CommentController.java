@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -65,5 +66,24 @@ public class CommentController {
       @Valid @RequestBody CommentUpdateRequest request
   ) {
     return commentService.updateComment(commentId, requestUserId, request);
+  }
+
+  @Operation(summary = "댓글 논리 삭제", description = "댓글을 논리적으로 삭제합니다.")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @DeleteMapping("/{commentId}")
+  public void deleteComment(
+      @PathVariable UUID commentId,
+      @RequestHeader("Monew-Request-User-ID") UUID requestUserId
+  ) {
+    commentService.deleteComment(commentId, requestUserId);
+  }
+
+  @Operation(summary = "댓글 물리 삭제", description = "댓글을 물리적으로 삭제합니다.")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @DeleteMapping("/{commentId}/hard")
+  public void hardDeleteComment(
+      @PathVariable UUID commentId
+  ) {
+    commentService.hardDeleteComment(commentId);
   }
 }
