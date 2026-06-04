@@ -11,11 +11,11 @@ import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
 import java.time.LocalDateTime;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -27,6 +27,22 @@ class RssArticleCollectorTest {
 
     private static final String HANKYUNG_RSS_URL = "https://www.hankyung.com/feed/all-news";
 
+    private RssProperties rssProperties;
+
+    private RssArticleCollector rssArticleCollector;
+
+    @BeforeEach
+    void setUp() {
+        rssProperties = new RssProperties();
+        rssProperties.getHankyung().setUrl(HANKYUNG_RSS_URL);
+
+        rssArticleCollector = new RssArticleCollector(
+                articleRepository,
+                restTemplateBuilder,
+                rssProperties
+        );
+    }
+
     @Mock
     private ArticleRepository articleRepository;
 
@@ -35,9 +51,6 @@ class RssArticleCollectorTest {
 
     @Mock
     private RestTemplate restTemplate;
-
-    @InjectMocks
-    private RssArticleCollector rssArticleCollector;
 
     @Test
     @DisplayName("한국경제 RSS item을 Article로 저장한다")

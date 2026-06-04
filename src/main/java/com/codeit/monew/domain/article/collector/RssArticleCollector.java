@@ -34,10 +34,9 @@ import org.xml.sax.InputSource;
 @RequiredArgsConstructor
 public class RssArticleCollector {
 
-    private static final String HANKYUNG_RSS_URL = "https://www.hankyung.com/feed/all-news";
-
     private final ArticleRepository articleRepository;
     private final RestTemplateBuilder restTemplateBuilder;
+    private final RssProperties rssProperties;
 
     public CollectResult collect() {
         String rssXml = fetchRssXml();
@@ -83,9 +82,15 @@ public class RssArticleCollector {
     }
 
     private String fetchRssXml() {
+        String rssUrl = rssProperties.getHankyung().getUrl();
+
+        if (!StringUtils.hasText(rssUrl)) {
+            throw new IllegalStateException("한국경제 RSS URL 설정이 필요합니다.");
+        }
+
         try {
             RestTemplate restTemplate = restTemplateBuilder.build();
-            String rssXml = restTemplate.getForObject(HANKYUNG_RSS_URL, String.class);
+            String rssXml = restTemplate.getForObject(rssUrl, String.class);
 
             if (!StringUtils.hasText(rssXml)) {
                 throw new IllegalArgumentException("한국경제 RSS 응답이 비어 있습니다.");

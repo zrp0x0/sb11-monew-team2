@@ -14,3 +14,10 @@ management:
 logging:
   level:
     root: info
+
+monew:
+  rss:
+    enabled: true
+    cron: "0 0 * * * *"
+    hankyung:
+      url: "https://www.hankyung.com/feed/all-news"
