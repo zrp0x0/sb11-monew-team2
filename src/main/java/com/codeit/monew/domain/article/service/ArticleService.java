@@ -1,6 +1,7 @@
 package com.codeit.monew.domain.article.service;
 
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
+import com.codeit.monew.domain.article.dto.request.CursorPageResponseDate;
 import com.codeit.monew.domain.article.dto.response.ArticleDto;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
@@ -14,13 +15,10 @@ import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.exception.UserErrorCode;
 import com.codeit.monew.domain.user.exception.UserException;
 import com.codeit.monew.domain.user.repository.UserRepository;
-import com.codeit.monew.global.dto.CursorPageResponse;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,17 +39,17 @@ public class ArticleService {
     }
 
     @Transactional(readOnly = true)
-    public CursorPageResponse<ArticleDto> searchArticles(ArticleSearchRequest request) {
+    public CursorPageResponseDate<ArticleDto> searchArticles(ArticleSearchRequest request) {
         validateSearchRequest(request);
 
-        CursorPageResponse<Article> articlePage = articleRepository.searchArticles(request);
+        CursorPageResponseDate<Article> articlePage = articleRepository.searchArticles(request);
 
         List<ArticleDto> content = articlePage.content()
             .stream()
             .map(article -> ArticleDto.from(article, false))
             .toList();
 
-        return new CursorPageResponse<>(
+        return new CursorPageResponseDate<>(
             content,
             articlePage.nextCursor(),
             articlePage.nextAfter(),

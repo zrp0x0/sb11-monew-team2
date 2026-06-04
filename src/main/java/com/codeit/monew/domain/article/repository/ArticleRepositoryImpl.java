@@ -4,9 +4,9 @@ import static com.codeit.monew.domain.article.entity.QArticle.article;
 import static com.codeit.monew.domain.article.entity.QArticleInterest.articleInterest;
 
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
+import com.codeit.monew.domain.article.dto.request.CursorPageResponseDate;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
-import com.codeit.monew.global.dto.CursorPageResponse;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -27,31 +27,34 @@ import org.springframework.util.StringUtils;
 public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
+    // 마이크로초(소수점 6자리) 정밀도를 완벽하게 보존하기 위한 포맷터 고정
+    private static final DateTimeFormatter CURSOR_DATE_FORMATTER = DateTimeFormatter.ofPattern(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
 
     @Override
-    public CursorPageResponse<Article> searchArticles(ArticleSearchRequest request) {
+    public CursorPageResponseDate<Article> searchArticles(ArticleSearchRequest request) {
 
         String orderBy =
             StringUtils.hasText(request.orderBy()) ? request.orderBy().trim() : "publishDate";
         String direction =
             StringUtils.hasText(request.direction()) ? request.direction().trim() : "DESC";
 
-        // 1. 목록을 조회함
+        // 1. 목록 조회 (기존 뼈대 및 한 개 더 조회하는 limit + 1 구조 유지)
         List<Article> articles = queryFactory
             .selectFrom(article)
             .where(
                 isNotDeleted(),
-                searchInterestId(request.interestId()), // 관심사 필터링 처리함
+                searchInterestId(request.interestId()),
                 searchKeyword(request.keyword()),
                 searchSourceIn(request.sourceIn()),
                 searchPublishDate(request.publishDateFrom(), request.publishDateTo()),
-                cursorCondition(orderBy, direction, request.cursor(), request.after())
+                cursorCondition(orderBy, direction, request.cursor()) // 삼중 커서 가공 함수로 대체
             )
             .orderBy(createOrderSpecifier(orderBy, direction))
             .limit(request.limit() + 1)
             .fetch();
 
-        // 2. 다음 페이지 존재 여부를 확인하고 리스트 사이즈를 조정함
+        // 2. 다음 페이지 존재 여부 확인 및 삼중 커서 결합
         boolean hasNext = articles.size() > request.limit();
         String nextCursor = null;
         LocalDateTime nextAfter = null;
@@ -62,22 +65,28 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 
         if (hasNext && !articles.isEmpty()) {
             Article lastArticle = articles.get(articles.size() - 1);
+
+            // DTO 구조 유지를 위해 원래 주던 대로 nextAfter 값은 채워줍니다.
             nextAfter = lastArticle.getCreatedAt();
 
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(
-                "yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+            String formattedCreateDate = lastArticle.getCreatedAt().format(CURSOR_DATE_FORMATTER);
 
+            // [핵심] 정렬 기준값, 생성일자, ID를 언더바(_)로 연결하여 하나의 문자열로 압축
             if ("publishDate".equals(orderBy)) {
-                String formattedDate = lastArticle.getPublishedAt().format(formatter);
-                nextCursor = formattedDate + "_" + lastArticle.getId();
+                String formattedPubDate = lastArticle.getPublishedAt()
+                    .format(CURSOR_DATE_FORMATTER);
+                nextCursor =
+                    formattedPubDate + "_" + formattedCreateDate + "_" + lastArticle.getId();
             } else if ("commentCount".equals(orderBy)) {
-                nextCursor = lastArticle.getCommentCount() + "_" + lastArticle.getId();
+                nextCursor = lastArticle.getCommentCount() + "_" + formattedCreateDate + "_"
+                    + lastArticle.getId();
             } else {
-                nextCursor = lastArticle.getViewCount() + "_" + lastArticle.getId();
+                nextCursor = lastArticle.getViewCount() + "_" + formattedCreateDate + "_"
+                    + lastArticle.getId();
             }
         }
 
-        // 4. 전체 카운트를 조회함 (첫 페이지 조회 시에만 실행하여 성능 chlwjrghk
+        // 3. 첫 페이지 조회 시에만 카운트 쿼리 실행 (최적화)
         Long totalElementCount = null;
         if (!StringUtils.hasText(request.cursor()) || "null".equalsIgnoreCase(
             request.cursor().trim()) || "undefined".equalsIgnoreCase(request.cursor().trim())) {
@@ -96,10 +105,10 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
             ).orElse(0L);
         }
 
-        return new CursorPageResponse<>(
+        return new CursorPageResponseDate<>(
             articles,
             nextCursor,
-            nextAfter != null ? nextAfter.toString() : null,
+            nextAfter,
             request.limit(),
             totalElementCount,
             hasNext
@@ -114,7 +123,6 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
         if (interestId == null) {
             return null;
         }
-        // EXISTS 서브쿼리를 적용하여 조인으로 인한 데이터 중복을 방지함
         return JPAExpressions.selectOne()
             .from(articleInterest)
             .where(
@@ -151,101 +159,98 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
         return condition;
     }
 
-    private BooleanExpression cursorCondition(String orderBy, String direction, String cursor,
-        LocalDateTime after) {
-        // 1. 진짜 첫 페이지 요청
+    /**
+     * 💡 핵심 개선 구간: 프론트가 after를 주지 않아도 cursor 문자열을 쪼개서 삼중 정렬 조건을 완벽하게 복원합니다.
+     */
+    private BooleanExpression cursorCondition(String orderBy, String direction, String cursor) {
+        // 첫 페이지 진입 처리 (방어 코드 포함)
         if (!StringUtils.hasText(cursor) || "null".equalsIgnoreCase(cursor.trim())
             || "undefined".equalsIgnoreCase(cursor.trim())) {
             return null;
         }
 
-        // 2. 형식이 완전히 깨진 커서 방어
-        if (!cursor.contains("_")) {
-            return Expressions.asBoolean(true).isFalse();
-        }
-
         boolean isAsc = "ASC".equalsIgnoreCase(direction);
-        int lastDashIndex = cursor.lastIndexOf("_");
 
         try {
-            String primaryCursorValue = cursor.substring(0, lastDashIndex);
-            UUID cursorId = UUID.fromString(cursor.substring(lastDashIndex + 1));
+            String[] parts = cursor.split("_");
+            // 만약 새로고침 등으로 옛날 포맷(이중 커서)이 들어오면 에러를 내지 않고 첫 페이지처럼 처리하거나 안전하게 닫음
+            if (parts.length < 3) {
+                return Expressions.asBoolean(true).isFalse();
+            }
 
+            String primaryStr = parts[0];     // 1정렬 기준값 (날짜 문자열 또는 숫자)
+            String secondaryStr = parts[1];   // 2정렬 기준값 (기사 생성일 고정)
+            UUID cursorId = UUID.fromString(parts[2]); // 3정렬 기준값 (ID 고정)
+
+            // 외부 파라미터 유실과 무관하게 내부 커서 문자열에서 기사 생성일을 정확하게 복구
+            LocalDateTime cursorCreatedAt = LocalDateTime.parse(secondaryStr,
+                CURSOR_DATE_FORMATTER);
+
+            // 1. 발행일(publishDate) 기준 페이징
             if ("publishDate".equals(orderBy)) {
-                LocalDateTime cursorDate = LocalDateTime.parse(primaryCursorValue);
+                LocalDateTime cursorPublishDate = LocalDateTime.parse(primaryStr,
+                    CURSOR_DATE_FORMATTER);
+
                 if (isAsc) {
-                    if (after != null) {
-                        return article.publishedAt.gt(cursorDate)
-                            .or(article.publishedAt.eq(cursorDate).and(article.createdAt.gt(after)))
-                            .or(article.publishedAt.eq(cursorDate).and(article.createdAt.eq(after))
-                                .and(article.id.gt(cursorId)));
-                    } else {
-                        // 프론트엔드가 after를 빼먹었을 때를 대비한 안전망 (createdAt 조건 무시하고 ID로만 비교함)
-                        return article.publishedAt.gt(cursorDate)
-                            .or(article.publishedAt.eq(cursorDate).and(article.id.gt(cursorId)));
-                    }
+                    return article.publishedAt.gt(cursorPublishDate)
+                        .or(article.publishedAt.eq(cursorPublishDate)
+                            .and(article.createdAt.gt(cursorCreatedAt)))
+                        .or(article.publishedAt.eq(cursorPublishDate)
+                            .and(article.createdAt.eq(cursorCreatedAt))
+                            .and(article.id.gt(cursorId)));
                 } else {
-                    if (after != null) {
-                        return article.publishedAt.lt(cursorDate)
-                            .or(article.publishedAt.eq(cursorDate).and(article.createdAt.lt(after)))
-                            .or(article.publishedAt.eq(cursorDate).and(article.createdAt.eq(after))
-                                .and(article.id.lt(cursorId)));
-                    } else {
-                        return article.publishedAt.lt(cursorDate)
-                            .or(article.publishedAt.eq(cursorDate).and(article.id.lt(cursorId)));
-                    }
+                    return article.publishedAt.lt(cursorPublishDate)
+                        .or(article.publishedAt.eq(cursorPublishDate)
+                            .and(article.createdAt.lt(cursorCreatedAt)))
+                        .or(article.publishedAt.eq(cursorPublishDate)
+                            .and(article.createdAt.eq(cursorCreatedAt))
+                            .and(article.id.lt(cursorId)));
                 }
-            } else if ("commentCount".equals(orderBy)) {
-                Long cursorCount = Long.valueOf(primaryCursorValue);
+            }
+
+            // 2. 댓글 수(commentCount) 기준 페이징
+            else if ("commentCount".equals(orderBy)) {
+                Long cursorCommentCount = Long.valueOf(primaryStr);
+
                 if (isAsc) {
-                    if (after != null) {
-                        return article.commentCount.gt(cursorCount)
-                            .or(article.commentCount.eq(cursorCount)
-                                .and(article.createdAt.gt(after)))
-                            .or(article.commentCount.eq(cursorCount)
-                                .and(article.createdAt.eq(after)).and(article.id.gt(cursorId)));
-                    } else {
-                        return article.commentCount.gt(cursorCount)
-                            .or(article.commentCount.eq(cursorCount).and(article.id.gt(cursorId)));
-                    }
+                    return article.commentCount.gt(cursorCommentCount)
+                        .or(article.commentCount.eq(cursorCommentCount)
+                            .and(article.createdAt.gt(cursorCreatedAt)))
+                        .or(article.commentCount.eq(cursorCommentCount)
+                            .and(article.createdAt.eq(cursorCreatedAt))
+                            .and(article.id.gt(cursorId)));
                 } else {
-                    if (after != null) {
-                        return article.commentCount.lt(cursorCount)
-                            .or(article.commentCount.eq(cursorCount)
-                                .and(article.createdAt.lt(after)))
-                            .or(article.commentCount.eq(cursorCount)
-                                .and(article.createdAt.eq(after)).and(article.id.lt(cursorId)));
-                    } else {
-                        return article.commentCount.lt(cursorCount)
-                            .or(article.commentCount.eq(cursorCount).and(article.id.lt(cursorId)));
-                    }
+                    return article.commentCount.lt(cursorCommentCount)
+                        .or(article.commentCount.eq(cursorCommentCount)
+                            .and(article.createdAt.lt(cursorCreatedAt)))
+                        .or(article.commentCount.eq(cursorCommentCount)
+                            .and(article.createdAt.eq(cursorCreatedAt))
+                            .and(article.id.lt(cursorId)));
                 }
-            } else {
-                Long cursorCount = Long.valueOf(primaryCursorValue);
+            }
+
+            // 3. 조회수(viewCount) 기준 페이징
+            else {
+                Long cursorViewCount = Long.valueOf(primaryStr);
+
                 if (isAsc) {
-                    if (after != null) {
-                        return article.viewCount.gt(cursorCount)
-                            .or(article.viewCount.eq(cursorCount).and(article.createdAt.gt(after)))
-                            .or(article.viewCount.eq(cursorCount).and(article.createdAt.eq(after))
-                                .and(article.id.gt(cursorId)));
-                    } else {
-                        return article.viewCount.gt(cursorCount)
-                            .or(article.viewCount.eq(cursorCount).and(article.id.gt(cursorId)));
-                    }
+                    return article.viewCount.gt(cursorViewCount)
+                        .or(article.viewCount.eq(cursorViewCount)
+                            .and(article.createdAt.gt(cursorCreatedAt)))
+                        .or(article.viewCount.eq(cursorViewCount)
+                            .and(article.createdAt.eq(cursorCreatedAt))
+                            .and(article.id.gt(cursorId)));
                 } else {
-                    if (after != null) {
-                        return article.viewCount.lt(cursorCount)
-                            .or(article.viewCount.eq(cursorCount).and(article.createdAt.lt(after)))
-                            .or(article.viewCount.eq(cursorCount).and(article.createdAt.eq(after))
-                                .and(article.id.lt(cursorId)));
-                    } else {
-                        return article.viewCount.lt(cursorCount)
-                            .or(article.viewCount.eq(cursorCount).and(article.id.lt(cursorId)));
-                    }
+                    return article.viewCount.lt(cursorViewCount)
+                        .or(article.viewCount.eq(cursorViewCount)
+                            .and(article.createdAt.lt(cursorCreatedAt)))
+                        .or(article.viewCount.eq(cursorViewCount)
+                            .and(article.createdAt.eq(cursorCreatedAt))
+                            .and(article.id.lt(cursorId)));
                 }
             }
         } catch (Exception e) {
-            // 날짜 파싱 에러나 UUID 파싱 에러가 발생해도 서버가 터지지 않고 0건을 반환하여 스크롤을 얌전하게 종료시킴
+            // 파싱 실패 시 빈 데이터를 리턴하도록 처리하여 시스템 안정성 확보
             return Expressions.asBoolean(true).isFalse();
         }
     }
@@ -267,7 +272,6 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
                 new OrderSpecifier<>(order, article.id)
             };
         } else {
-            // viewCount 정렬 처리함
             return new OrderSpecifier[]{
                 new OrderSpecifier<>(order, article.viewCount),
                 new OrderSpecifier<>(order, article.createdAt),
