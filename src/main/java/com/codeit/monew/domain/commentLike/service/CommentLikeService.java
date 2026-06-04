@@ -8,9 +8,11 @@ import com.codeit.monew.domain.commentLike.entity.CommentLike;
 import com.codeit.monew.domain.commentLike.exception.CommentLikeErrorCode;
 import com.codeit.monew.domain.commentLike.exception.CommentLikeException;
 import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
+import com.codeit.monew.domain.notification.listener.NotificationCreateEvent;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +26,7 @@ public class CommentLikeService {
     private final CommentLikeRepository commentLikeRepository;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CommentLikeDto create(UUID commentId, UUID requestUserId)  {
         Comment comment = commentRepository.findById(commentId)
@@ -39,6 +42,7 @@ public class CommentLikeService {
         CommentLike commentLike = new CommentLike(comment, user);
         commentLikeRepository.save(commentLike);
         comment.increaseLikeCount();
+        eventPublisher.publishEvent(NotificationCreateEvent.createByCommentLike(comment, user));
         return mapper(commentLike, comment, user);
     }
 
