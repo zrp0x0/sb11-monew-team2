@@ -6,6 +6,7 @@ import com.codeit.monew.domain.comment.repository.CommentRepository;
 import com.codeit.monew.domain.commentLike.entity.CommentLike;
 import com.codeit.monew.domain.commentLike.exception.CommentLikeException;
 import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
+import com.codeit.monew.domain.notification.listener.NotificationCreateEvent;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,6 +34,9 @@ class CommentLikeServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private CommentLikeService commentLikeService;
@@ -73,6 +78,7 @@ class CommentLikeServiceTest {
 
         verify(commentLikeRepository).save(any(CommentLike.class));
         verify(comment).increaseLikeCount();
+        verify(eventPublisher).publishEvent(any(NotificationCreateEvent.class));
     }
 
     @Test
@@ -88,6 +94,7 @@ class CommentLikeServiceTest {
 
         verify(userRepository, never()).findById(any());
         verify(commentLikeRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -107,6 +114,7 @@ class CommentLikeServiceTest {
                 () -> commentLikeService.create(commentId, requestUserId));
 
         verify(commentLikeRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -132,6 +140,7 @@ class CommentLikeServiceTest {
 
         verify(commentLikeRepository, never()).save(any());
         verify(comment, never()).increaseLikeCount();
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
