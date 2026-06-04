@@ -546,6 +546,7 @@ public class CommentServiceTest {
 
       then(commentLikeRepository).should().deleteAllByCommentId(commentId);
       then(commentRepository).should().delete(comment);
+      then(article).should().decreaseCommentCount();
     }
 
     @Test

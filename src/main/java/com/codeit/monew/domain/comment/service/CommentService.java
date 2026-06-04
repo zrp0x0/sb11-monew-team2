@@ -158,6 +158,7 @@ public class CommentService {
 
     commentLikeRepository.deleteAllByCommentId(commentId);
     commentRepository.delete(comment);
+    comment.getArticle().decreaseCommentCount();
 
     log.info("댓글 물리 삭제 성공. CommentId: {}", commentId);
   }
