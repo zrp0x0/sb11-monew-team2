@@ -138,17 +138,13 @@ public class CommentService {
   }
 
   @Transactional
-  public void deleteComment(UUID commentId, UUID userId) {
+  public void deleteComment(UUID commentId) {
     Comment comment = commentRepository.findById(commentId)
         .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
 
-    if(!comment.getUser().getId().equals(userId)) {
-      throw new CommentException(CommentErrorCode.COMMENT_UNAUTHORIZED);
-    }
-
     comment.softDelete();
     comment.getArticle().decreaseCommentCount();
-    log.info("댓글 삭제 성공. CommentId: {}, UserId: {}", commentId, userId);
+    log.info("댓글 삭제 성공. CommentId: {}", commentId);
   }
 
   @Transactional
