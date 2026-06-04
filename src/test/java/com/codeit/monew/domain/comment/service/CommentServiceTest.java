@@ -541,6 +541,7 @@ public class CommentServiceTest {
       Comment comment = mock(Comment.class);
 
       given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+      given(comment.getArticle()).willReturn(article);
 
       commentService.hardDeleteComment(commentId);
 
