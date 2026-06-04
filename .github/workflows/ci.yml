@@ -51,7 +51,10 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: pass
         run: ./gradlew test jacocoTestCoverageVerification bootJar --no-daemon
 
-      - name: 5. 배포 산출물(JAR) 업로드하기
+      - name: 5. Docker 이미지 빌드 검증하기
+        run: docker build --tag monew:${{ github.sha }} .
+
+      - name: 6. 배포 산출물(JAR) 업로드하기
         uses: actions/upload-artifact@v4
         with:
           name: monew-boot-jar
