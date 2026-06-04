@@ -15,15 +15,14 @@ public interface ArticleRepository extends JpaRepository<Article, UUID>, Article
     List<Article> findBySourceUrlIn(List<String> sourceUrls);
 
     @Query(
-            value = """
-                    SELECT EXISTS (
-                         SELECT 1
-                         FROM articles
-                         WHERE source_url = :sourceUrl                                          
-                    )
-                    """,
-            nativeQuery = true
+        value = """
+            SELECT EXISTS (
+                 SELECT 1
+                 FROM articles
+                 WHERE source_url = :sourceUrl                                          
+            )
+            """,
+        nativeQuery = true
     )
-
     boolean existsBySourceUrlIncludingDeleted(@Param("sourceUrl") String sourceUrl);
 }
