@@ -21,6 +21,9 @@ spring:
 
 batch:
   chunk-size: 3
+  comment:
+    hard-delete:
+      batch-size: 10
 
 scheduling:
   enabled: false # 테스트 시 스케줄러 끔
@@ -35,9 +38,3 @@ external-api:
     url: https://openapi.naver.com
     client-id: ${NAVER_CLIENT_ID:your_client_id}
     client-secret: ${NAVER_CLIENT_SECRET:your_client_secret}
-
-batch:
-  comment:
-    hard-delete:
-      batch-size: 10
-
