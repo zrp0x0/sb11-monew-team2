@@ -30,4 +30,14 @@ logging:
     root: info
     org.hibernate.SQL: debug
 
+external-api:
+  naver:
+    url: https://openapi.naver.com
+    client-id: ${NAVER_CLIENT_ID:your_client_id}
+    client-secret: ${NAVER_CLIENT_SECRET:your_client_secret}
+
+batch:
+  comment:
+    hard-delete:
+      batch-size: 10
 

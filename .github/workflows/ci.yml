@@ -3,6 +3,12 @@ name: CI Pipeline
 on:
   pull_request:
     branches: [ "main", "develop" ]
+  push:
+    branches: [ "main", "develop" ]
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-and-test:
@@ -40,12 +46,46 @@ jobs:
       - name: 3. gradlew에 실행 권한 부여하기
         run: chmod +x gradlew
 
-      - name: 4. 데이터베이스 연결 및 프로젝트 빌드 및 커버리지 검사하기 (테스트 실행)
+      - name: 4. 데이터베이스 연결 및 프로젝트 빌드, 커버리지 검사, 배포 산출물 생성하기
         # 테스트 실행 후, 80% 룰(jacocoTestCoverageVerification)까지 검사
+        # CD 준비를 위해 bootJar 실행 JAR 생성 여부까지 검증
         env:
-          DB_HOST: localhost
-          DB_PORT: 5433
-          DB_NAME: monew_test
-          DB_USER: user
-          DB_PASSWORD: pass
-        run: ./gradlew test jacocoTestCoverageVerification --no-daemon
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/monew_test
+          SPRING_DATASOURCE_USERNAME: user
+          SPRING_DATASOURCE_PASSWORD: pass
+        run: ./gradlew test jacocoTestCoverageVerification bootJar --no-daemon
+
+      - name: 5. Docker 이미지 빌드 검증하기
+        # Docker image build 가능 여부를 검증하며, PR 단계에서는 registry push를 수행하지 않음
+        run: docker build --tag monew:${{ github.sha }} .
+
+      - name: 6. 배포 산출물(JAR) 업로드하기
+        uses: actions/upload-artifact@v4
+        with:
+          name: monew-boot-jar
+          path: build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 7. GHCR 로그인하기
+        if: github.event_name == 'push'
+        # GITHUB_TOKEN을 사용하여 GitHub Container Registry에 로그인
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: 8. Docker 이미지 태그 생성 및 GHCR 업로드하기
+        if: github.event_name == 'push'
+        # develop/main 최종 커밋 기준 image를 GHCR에 업로드
+        run: |
+          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY,,}"
+
+          if [ "${GITHUB_REF_NAME}" = "develop" ]; then
+            docker tag monew:${GITHUB_SHA} "${IMAGE_NAME}:develop-${GITHUB_SHA}"
+            docker tag monew:${GITHUB_SHA} "${IMAGE_NAME}:staging"
+            docker push "${IMAGE_NAME}:develop-${GITHUB_SHA}"
+            docker push "${IMAGE_NAME}:staging"
+          elif [ "${GITHUB_REF_NAME}" = "main" ]; then
+            docker tag monew:${GITHUB_SHA} "${IMAGE_NAME}:main-${GITHUB_SHA}"
+            docker tag monew:${GITHUB_SHA} "${IMAGE_NAME}:production"
+            docker push "${IMAGE_NAME}:main-${GITHUB_SHA}"
+            docker push "${IMAGE_NAME}:production"
+          fi

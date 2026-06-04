@@ -17,3 +17,9 @@ logging:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
     com.codeit.monew: trace
+
+external-api:
+  naver:
+    url: https://openapi.naver.com
+    client-id: ${NAVER_CLIENT_ID:your_client_id}
+    client-secret: ${NAVER_CLIENT_SECRET:your_client_secret}

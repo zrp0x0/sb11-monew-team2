@@ -97,6 +97,7 @@ public class CommentServiceTest {
       assertThat(result.likedByMe()).isFalse();
       assertThat(result.likeCount()).isZero();
       then(commentRepository).should().save(any(Comment.class));
+      then(article).should().increaseCommentCount();
     }
 
     @Test
@@ -469,6 +470,100 @@ public class CommentServiceTest {
           .isInstanceOf(CommentException.class)
           .extracting("errorCode")
           .isEqualTo(CommentErrorCode.COMMENT_UNAUTHORIZED);
+    }
+  }
+
+  @Nested
+  @DisplayName("deleteComment")
+  class DeleteComment {
+
+    @Test
+    @DisplayName("유효한 요청일 경우 댓글을 논리 삭제")
+    void deleteComment_ValidRequest_SoftDeletesComment() {
+      UUID commentId = UUID.randomUUID();
+
+      Comment comment = mock(Comment.class);
+
+      given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+      given(comment.getUser()).willReturn(user);
+      given(comment.getArticle()).willReturn(article);
+      given(user.getId()).willReturn(userId);
+
+      commentService.deleteComment(commentId, userId);
+
+      then(comment).should().softDelete();
+      then(article).should().decreaseCommentCount();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 commentId이면 CommentException을 던짐")
+    void deleteComment_CommentNotFound_ThrowsCommentException() {
+      UUID commentId = UUID.randomUUID();
+
+      given(commentRepository.findById(commentId)).willReturn(Optional.empty());
+
+      assertThatThrownBy(() -> commentService.deleteComment(commentId, userId))
+          .isInstanceOf(CommentException.class)
+          .extracting("errorCode")
+          .isEqualTo(CommentErrorCode.COMMENT_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("댓글 작성자가 아닐 경우 CommentException을 던짐")
+    void deleteComment_IsNotCommentOwner_ThrowsCommentException() {
+      UUID commentId = UUID.randomUUID();
+      UUID otherUserId = UUID.randomUUID();
+
+      Comment comment = mock(Comment.class);
+
+      given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+      given(comment.getUser()).willReturn(user);
+      given(user.getId()).willReturn(userId);
+
+      assertThatThrownBy(() -> commentService.deleteComment(commentId, otherUserId))
+          .isInstanceOf(CommentException.class)
+          .extracting("errorCode")
+          .isEqualTo(CommentErrorCode.COMMENT_UNAUTHORIZED);
+
+      then(comment).should(never()).softDelete();
+    }
+  }
+
+  @Nested
+  @DisplayName("hardDeleteComment")
+  class HardDeleteComment {
+
+    @Test
+    @DisplayName("유효한 요청일 경우 CommentLike를 먼저 물리 삭제 후 댓글 물리 삭제")
+    void hardDeleteComment_ValidRequest_DeletesCommentAndLikes() {
+      UUID commentId = UUID.randomUUID();
+
+      Comment comment = mock(Comment.class);
+
+      given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+      given(comment.getArticle()).willReturn(article);
+
+      commentService.hardDeleteComment(commentId);
+
+      then(commentLikeRepository).should().deleteAllByCommentId(commentId);
+      then(commentRepository).should().delete(comment);
+      then(article).should().decreaseCommentCount();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 commentId이면 CommentException을 던짐")
+    void hardDeleteComment_CommentNotFound_ThrowsCommentException() {
+      UUID commentId = UUID.randomUUID();
+
+      given(commentRepository.findById(commentId)).willReturn(Optional.empty());
+
+      assertThatThrownBy(() -> commentService.hardDeleteComment(commentId))
+          .isInstanceOf(CommentException.class)
+          .extracting("errorCode")
+          .isEqualTo(CommentErrorCode.COMMENT_NOT_FOUND);
+
+      then(commentLikeRepository).should(never()).deleteAllByCommentId(any());
+      then(commentRepository).should(never()).delete(any());
     }
   }
 }
