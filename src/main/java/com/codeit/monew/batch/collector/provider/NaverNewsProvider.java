@@ -9,6 +9,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +38,6 @@ public class NaverNewsProvider implements NewsProvider {
             return Collections.emptyList();
         }
 
-        // 키워드들을 OR로 묶어서 query string 만들기
         String combinedQuery = keywords.stream()
             .filter(k -> k != null && !k.isBlank())
             .collect(Collectors.joining(" OR "));
@@ -55,15 +55,24 @@ public class NaverNewsProvider implements NewsProvider {
             }
 
             return response.items().stream()
-                .filter(item -> item.originallink() != null && !item.originallink().isBlank())
-                .map(item -> new CollectedNewsDto(
-                    getSource(),
-                    item.originallink(),
-                    stripHtmlTags(item.title()),
-                    parsePubDate(item.pubDate()),
-                    stripHtmlTags(item.description()),
-                    interest.getId()
-                ))
+                // 원문 링크(originallink)나 네이버 링크(link) 중 하나라도 있으면 통과
+                .filter(item -> (item.originallink() != null && !item.originallink().isBlank())
+                    || (item.link() != null && !item.link().isBlank()))
+                .map(item -> {
+                    // Fallback 적용: originallink가 유효하면 우선 사용, 없으면 link 사용 - PR 반영
+                    String targetUrl =
+                        (item.originallink() != null && !item.originallink().isBlank())
+                            ? item.originallink() : item.link();
+
+                    return new CollectedNewsDto(
+                        getSource(),
+                        targetUrl,
+                        stripHtmlTags(item.title()),
+                        parsePubDate(item.pubDate()),
+                        stripHtmlTags(item.description()),
+                        Set.of(interest.getId()) // Set으로 감싸서 전달
+                    );
+                })
                 .toList();
         } catch (Exception e) {
             log.error("[NaverNewsProvider] 뉴스 수집 중 예외 발생. 관심사 ID: {}, 원인: {}", interest.getId(),
@@ -93,5 +102,4 @@ public class NaverNewsProvider implements NewsProvider {
             return LocalDateTime.now();
         }
     }
-
 }
