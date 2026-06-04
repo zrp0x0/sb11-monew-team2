@@ -131,7 +131,7 @@ public class ArticleRestoreBatchConfigTest {
     for (int i = 1; i <= 8; i++) {
       jsonBuilder.append(String.format(
           "{\"id\":\"%s\", \"source\":\"NAVER\", \"title\":\"청크 복구 기사 %d\", \"summary\":\"요약 %d\", \"sourceUrl\":\"http://test.com/chunk-restore%d\", \"publishDate\":\"2026-01-01T10:00:00\"}",
-          UUID.randomUUID().toString(), i, i, i
+          UUID.randomUUID(), i, i, i
       ));
       if (i < 8) {
         jsonBuilder.append(",\n");
