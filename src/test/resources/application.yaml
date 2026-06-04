@@ -13,7 +13,21 @@ spring:
         format_sql: true
         default_batch_fetch_size: 100
 
+  batch:
+    jdbc:
+      initialize-schema: always # 테스트 시 배치 전용 테이블(6개)을 자동으로 생성
+    job:
+      enabled: false # 테스트 시 서버 구동 시 배치가 자동으로 도는 것을 방지
+
+batch:
+  chunk-size: 3
+
+scheduling:
+  enabled: false # 테스트 시 스케줄러 끔
+
 logging:
   level:
     root: info
     org.hibernate.SQL: debug
+
+
