@@ -13,7 +13,6 @@ public interface ArticleRepository extends JpaRepository<Article, UUID>, Article
   Optional<Article> findByIdAndDeletedAtIsNull(UUID articleId);
 
   boolean existsBySourceUrl(String sourceUrl);
-    Optional<Article> findByIdAndDeletedAtIsNull(UUID articleId);
 
     List<Article> findBySourceUrlIn(List<String> sourceUrls);
 
