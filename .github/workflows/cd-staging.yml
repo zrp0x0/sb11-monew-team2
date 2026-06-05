@@ -1,0 +1,115 @@
+name: CD Staging
+
+on:
+  workflow_run:
+    workflows: [ "CI Pipeline" ]
+    types: [ completed ]
+    branches: [ "develop" ]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "GHCR image tag to deploy"
+        required: false
+        default: "staging"
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: 1. 배포 image tag 결정하기
+        run: |
+          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY,,}"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            IMAGE_TAG="${{ inputs.image_tag }}"
+          else
+            IMAGE_TAG="develop-${{ github.event.workflow_run.head_sha }}"
+          fi
+
+          echo "IMAGE_NAME=${IMAGE_NAME}" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "Deploy target image: ${IMAGE_NAME}:${IMAGE_TAG}"
+
+      - name: 2. SSH 설정하기
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
+        run: |
+          SSH_PORT="${STAGING_SSH_PORT:-22}"
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$STAGING_SSH_KEY" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+
+          ssh-keyscan -p "$SSH_PORT" -H "$STAGING_HOST" >> ~/.ssh/known_hosts
+          echo "SSH_PORT=${SSH_PORT}" >> "$GITHUB_ENV"
+
+      - name: 3. Staging 서버에 image 배포하기
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_APP_DIR: ${{ secrets.STAGING_APP_DIR }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
+          GHCR_TOKEN_B64="$(printf '%s' "$GHCR_TOKEN" | base64 -w 0)"
+
+          ssh -i ~/.ssh/staging_key -p "$SSH_PORT" "$STAGING_USER@$STAGING_HOST" 'bash -s' <<EOF
+          set -euo pipefail
+
+          cd "$STAGING_APP_DIR"
+
+          echo "$GHCR_TOKEN_B64" | base64 -d | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+          if [ -f .env ] && grep -q '^APP_IMAGE=' .env; then
+            sed -i "s#^APP_IMAGE=.*#APP_IMAGE=$IMAGE#" .env
+          else
+            printf '\nAPP_IMAGE=%s\n' "$IMAGE" >> .env
+          fi
+
+          docker compose pull app
+          docker compose up -d app
+          EOF
+
+      - name: 4. Staging 헬스 체크하기
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_APP_DIR: ${{ secrets.STAGING_APP_DIR }}
+          STAGING_HEALTHCHECK_URL: ${{ secrets.STAGING_HEALTHCHECK_URL }}
+        run: |
+          HEALTHCHECK_URL="${STAGING_HEALTHCHECK_URL:-http://localhost:8080/actuator/health}"
+
+          ssh -i ~/.ssh/staging_key -p "$SSH_PORT" "$STAGING_USER@$STAGING_HOST" 'bash -s' <<EOF
+          set -euo pipefail
+
+          cd "$STAGING_APP_DIR"
+
+          i=1
+          while [ "\$i" -le 30 ]; do
+            if curl -fsS "$HEALTHCHECK_URL" | grep -q '"status":"UP"'; then
+              echo "Staging health check passed"
+              exit 0
+            fi
+
+            echo "Waiting for staging health check... (\$i/30)"
+            sleep 3
+            i=\$((i + 1))
+          done
+
+          docker compose logs --tail=200 app || true
+          exit 1
+          EOF
