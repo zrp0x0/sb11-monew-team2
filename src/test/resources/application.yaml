@@ -51,4 +51,4 @@ cloud:
 
 aws:
   s3:
-    bucket: ${AWS_S3_BUCKET_NAME:test-bucket}
+    bucket: ${AWS_S3_BUCKET_NAME:dummy-bucket}
