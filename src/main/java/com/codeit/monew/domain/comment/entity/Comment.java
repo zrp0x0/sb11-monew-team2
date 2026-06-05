@@ -14,7 +14,9 @@ import java.util.UUID;
 import static com.codeit.monew.global.entity.BaseSoftDeleteEntity.IS_DELETED_FALSE;
 
 @Entity
-@Table(name = "comments")
+@Table(name = "comments", indexes = {
+    @Index(name = "idx_comments_deleted_at", columnList = "deleted_at")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLRestriction(IS_DELETED_FALSE)
