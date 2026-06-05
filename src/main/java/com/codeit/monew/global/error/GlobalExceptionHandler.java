@@ -7,8 +7,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Slf4j
@@ -58,6 +60,23 @@ public class GlobalExceptionHandler {
         return ResponseEntity
             .status(GlobalErrorCode.INVALID_UUID_FORMAT.getHttpStatus())
             .body(ErrorResponse.of(GlobalErrorCode.INVALID_UUID_FORMAT, e));
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorResponse> handleHandlerMethodValidationException(HandlerMethodValidationException e) {
+        log.warn("[HandlerMethodValidationException] Message: {}", e.getMessage());
+        return ResponseEntity
+            .status(GlobalErrorCode.INVALID_INPUT_VALUE.getHttpStatus())
+            .body(ErrorResponse.of(GlobalErrorCode.INVALID_INPUT_VALUE, e));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestParameterException(
+        MissingServletRequestParameterException e) {
+        log.warn("[MissingServletRequestParameterException] ParameterName: {}", e.getParameterName());
+        return ResponseEntity
+            .status(GlobalErrorCode.INVALID_INPUT_VALUE.getHttpStatus())
+            .body(ErrorResponse.of(GlobalErrorCode.INVALID_INPUT_VALUE, e));
     }
 
     // INTERNAL_SERVER_ERROR
