@@ -54,6 +54,10 @@ public class ArticleRestoreService {
 
           JobExecution jobExecution = jobLauncher.run(articleRestoreJob, params);
 
+          if (jobExecution.getStatus().isUnsuccessful()) {
+            throw new JobExecutionException("기사 복구 배치 실패");
+          }
+
           List<String> restoredIds = (List<String>) jobExecution.getExecutionContext().get("RESTORED_ARTICLE_IDS");
           if (restoredIds == null) {
             restoredIds = new ArrayList<>();
