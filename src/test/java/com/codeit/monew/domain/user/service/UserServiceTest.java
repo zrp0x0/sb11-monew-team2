@@ -208,7 +208,7 @@ class UserServiceTest {
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
         // when
-        UserDto response = userService.update(userId, userId.toString(), request);
+        UserDto response = userService.update(userId, request);
 
         // then
         assertThat(response.id()).isEqualTo(userId);
@@ -222,36 +222,43 @@ class UserServiceTest {
 
     @Test
     @DisplayName("요청자 헤더가 없으면 사용자 정보 수정에 실패")
-    void update_fail_whenRequestUserHeaderMissing() {
+    void update_success_withoutRequestUserHeader() {
         // given
         UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        User user = User.create(
+                "test@email.com",
+                "oldNickname",
+                "$2y$04$CnmQ.L0MoRdQxDev/JnKaOKKDqae5Ja40NMIgep0h7xRbX6jhRzZm"
+        );
+        ReflectionTestUtils.setField(user, "id", userId);
         UserUpdateRequest request = new UserUpdateRequest("newNickname");
 
-        // when & then
-        assertThatThrownBy(() -> userService.update(userId, null, request))
-                .isInstanceOf(UserException.class)
-                .extracting("errorCode")
-                .isEqualTo(UserErrorCode.REQUEST_USER_ID_REQUIRED);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-        verify(userRepository, never()).findById(any(UUID.class));
+        // when
+        UserDto response = userService.update(userId, request);
+
+        // then
+        assertThat(response.nickname()).isEqualTo("newNickname");
+        verify(userRepository).findById(userId);
         verifyNoInteractions(passwordEncoder);
     }
 
     @Test
     @DisplayName("요청자 ID와 수정 대상 userId가 다르면 사용자 정보 수정에 실패")
-    void update_fail_whenRequestUserMismatched() {
+    void update_fail_whenUserNotFoundWithoutRequestUserHeader() {
         // given
         UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         UUID requestUserId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         UserUpdateRequest request = new UserUpdateRequest("newNickname");
 
         // when & then
-        assertThatThrownBy(() -> userService.update(userId, requestUserId.toString(), request))
+        assertThatThrownBy(() -> userService.update(userId, request))
                 .isInstanceOf(UserException.class)
                 .extracting("errorCode")
-                .isEqualTo(UserErrorCode.USER_ACCESS_DENIED);
+                .isEqualTo(UserErrorCode.USER_NOT_FOUND);
 
-        verify(userRepository, never()).findById(any(UUID.class));
+        verify(userRepository).findById(userId);
         verifyNoInteractions(passwordEncoder);
     }
 
@@ -265,7 +272,7 @@ class UserServiceTest {
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> userService.update(userId, userId.toString(), request))
+        assertThatThrownBy(() -> userService.update(userId, request))
                 .isInstanceOf(UserException.class)
                 .extracting("errorCode")
                 .isEqualTo(UserErrorCode.USER_NOT_FOUND);
@@ -283,7 +290,7 @@ class UserServiceTest {
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> userService.update(userId, userId.toString(), request))
+        assertThatThrownBy(() -> userService.update(userId, request))
                 .isInstanceOf(UserException.class)
                 .extracting("errorCode")
                 .isEqualTo(UserErrorCode.USER_NOT_FOUND);

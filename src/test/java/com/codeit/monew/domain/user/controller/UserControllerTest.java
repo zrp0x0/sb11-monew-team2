@@ -2,7 +2,6 @@ package com.codeit.monew.domain.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -196,12 +195,11 @@ class UserControllerTest {
         UserDto response = new UserDto(userId, "user@example.com", "NewNickname", createdAt);
         Map<String, String> request = Map.of("nickname", "NewNickname");
 
-        when(userService.update(eq(userId), eq(userId.toString()), any(UserUpdateRequest.class)))
+        when(userService.update(eq(userId), any(UserUpdateRequest.class)))
                 .thenReturn(response);
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
-                        .header("Monew-Request-User-ID", userId.toString())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -224,7 +222,6 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
-                        .header("Monew-Request-User-ID", userId.toString())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -236,44 +233,48 @@ class UserControllerTest {
 
     @Test
     @DisplayName("요청자 헤더가 없으면 401 Unauthorized를 반환")
-    void update_fail_whenRequestUserHeaderMissing() throws Exception {
+    void update_success_whenRequestUserHeaderMissing() throws Exception {
         // given
         UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        LocalDateTime createdAt = LocalDateTime.of(2026, 5, 26, 12, 0);
+        UserDto response = new UserDto(userId, "user@example.com", "NewNickname", createdAt);
         Map<String, String> request = Map.of("nickname", "NewNickname");
 
-        when(userService.update(eq(userId), isNull(), any(UserUpdateRequest.class)))
-                .thenThrow(new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED));
+        when(userService.update(eq(userId), any(UserUpdateRequest.class)))
+                .thenReturn(response);
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.code").value("REQUEST_USER_ID_REQUIRED"));
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.nickname").value("NewNickname"));
     }
 
     @Test
     @DisplayName("요청자 ID와 수정 대상 userId가 다르면 403 Forbidden을 반환")
-    void update_fail_whenRequestUserMismatched() throws Exception {
+    void update_success_whenRequestUserHeaderMismatched() throws Exception {
         // given
         UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         UUID requestUserId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        LocalDateTime createdAt = LocalDateTime.of(2026, 5, 26, 12, 0);
+        UserDto response = new UserDto(userId, "user@example.com", "NewNickname", createdAt);
         Map<String, String> request = Map.of("nickname", "NewNickname");
 
-        when(userService.update(eq(userId), eq(requestUserId.toString()), any(UserUpdateRequest.class)))
-                .thenThrow(new UserException(UserErrorCode.USER_ACCESS_DENIED));
+        when(userService.update(eq(userId), any(UserUpdateRequest.class)))
+                .thenReturn(response);
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
                         .header("Monew-Request-User-ID", requestUserId.toString())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(403))
-                .andExpect(jsonPath("$.code").value("USER_ACCESS_DENIED"));
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.nickname").value("NewNickname"));
     }
 
     @Test
@@ -283,12 +284,11 @@ class UserControllerTest {
         UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         Map<String, String> request = Map.of("nickname", "NewNickname");
 
-        when(userService.update(eq(userId), eq(userId.toString()), any(UserUpdateRequest.class)))
+        when(userService.update(eq(userId), any(UserUpdateRequest.class)))
                 .thenThrow(new UserException(UserErrorCode.USER_NOT_FOUND));
 
         // when & then
         mockMvc.perform(patch("/api/users/{userId}", userId)
-                        .header("Monew-Request-User-ID", userId.toString())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())

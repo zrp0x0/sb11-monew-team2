@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
@@ -47,6 +48,8 @@ public class ArticleRestoreServiceTest {
     JobExecution mockExecution = mock(JobExecution.class);
     ExecutionContext mockContext = mock(ExecutionContext.class);
 
+    given(mockExecution.getStatus())
+        .willReturn(BatchStatus.COMPLETED);
     given(jobLauncher.run(eq(articleRestoreJob), any(JobParameters.class)))
         .willReturn(mockExecution);
     given(mockExecution.getExecutionContext())
@@ -73,6 +76,8 @@ public class ArticleRestoreServiceTest {
     JobExecution mockExecution = mock(JobExecution.class);
     ExecutionContext mockContext = mock(ExecutionContext.class);
 
+    given(mockExecution.getStatus())
+        .willReturn(BatchStatus.COMPLETED);
     given(jobLauncher.run(any(), any()))
         .willThrow(new JobParametersInvalidException("1차 실패"))
         .willThrow(new JobParametersInvalidException("2차 실패"))
@@ -101,6 +106,8 @@ public class ArticleRestoreServiceTest {
     JobExecution mockExecution = mock(JobExecution.class);
     ExecutionContext mockContext = mock(ExecutionContext.class);
 
+    given(mockExecution.getStatus())
+        .willReturn(BatchStatus.COMPLETED);
     given(jobLauncher.run(any(), any()))
         .willThrow(new JobParametersInvalidException("6/1 - 1차 실패"))
         .willThrow(new JobParametersInvalidException("6/1 - 2차 실패"))
