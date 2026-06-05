@@ -1,4 +1,6 @@
 spring:
+  flyway:
+    enabled: true
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -11,6 +13,15 @@ spring:
       hibernate:
         format_sql: false
         default_batch_fetch_size: 100
+  batch:
+    job:
+      enabled: false
+
+external-api:
+  naver:
+    url: ${NAVER_API_URL:https://openapi.naver.com}
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}
 
 logging:
   level:
