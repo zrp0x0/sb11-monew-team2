@@ -68,23 +68,20 @@ public class CommentService {
     log.info("댓글 목록 조회. ArticleId: {}, cursor: {}, after: {}, limit: {}, orderBy: {}, direction: {}",
         articleId, cursor, after, limit, orderBy, direction);
 
-    if((cursor == null) != (after == null)) {
-      throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
-    }
-
-    if(cursor != null) {
-      if (orderBy == CommentOrderBy.likeCount) {
+    if (orderBy == CommentOrderBy.likeCount) {
+      if ((cursor == null) != (after == null)) {
+        throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
+      }
+      if(cursor != null) {
         try {
           Integer.parseInt(cursor);
         } catch (NumberFormatException e) {
           throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
         }
-      } else {
-        try {
-          UUID.fromString(cursor);
-        } catch (IllegalArgumentException e) {
-          throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
-        }
+      }
+    } else {
+      if (cursor != null) {
+        throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
       }
     }
 
@@ -93,13 +90,10 @@ public class CommentService {
     // TODO: 댓글이 많아질 경우 COUNT 쿼리 성능 저하 가능성이 있음
     long totalElements = commentRepository.countByArticleId(articleId);
 
-    UUID cursorId = (cursor != null && orderBy == CommentOrderBy.createdAt)
-        ? UUID.fromString(cursor) : null;
-    Integer cursorLikeCount = (cursor != null && orderBy == CommentOrderBy.likeCount)
-        ? Integer.parseInt(cursor) : null;
+    Integer cursorLikeCount = cursor != null ? Integer.parseInt(cursor) : null;
 
     List<Comment> comments = commentRepository.findComments(
-        articleId, orderBy, after, cursorId, cursorLikeCount, queryLimit
+        articleId, orderBy, after, null, cursorLikeCount, queryLimit
     );
 
     List<UUID> commentIds = comments.stream()
