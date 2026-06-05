@@ -68,18 +68,22 @@ public class CommentService {
     log.info("댓글 목록 조회. ArticleId: {}, cursor: {}, after: {}, limit: {}, orderBy: {}, direction: {}",
         articleId, cursor, after, limit, orderBy, direction);
 
-    if((cursor == null) != (after == null)) {
-      throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
-    }
-
-    if(cursor != null) {
-      if (orderBy == CommentOrderBy.likeCount) {
+    if (orderBy == CommentOrderBy.likeCount) {
+      if ((cursor == null) != (after == null)) {
+        throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
+      }
+      if(cursor != null) {
         try {
           Integer.parseInt(cursor);
         } catch (NumberFormatException e) {
           throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
         }
-      } else {
+      }
+    } else {
+      if ((cursor == null) != (after == null)) {
+        throw new CommentException(CommentErrorCode.INVALID_CURSOR_PARAMETER);
+      }
+      if (cursor != null) {
         try {
           UUID.fromString(cursor);
         } catch (IllegalArgumentException e) {
@@ -138,17 +142,13 @@ public class CommentService {
   }
 
   @Transactional
-  public void deleteComment(UUID commentId, UUID userId) {
+  public void deleteComment(UUID commentId) {
     Comment comment = commentRepository.findById(commentId)
         .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
 
-    if(!comment.getUser().getId().equals(userId)) {
-      throw new CommentException(CommentErrorCode.COMMENT_UNAUTHORIZED);
-    }
-
     comment.softDelete();
     comment.getArticle().decreaseCommentCount();
-    log.info("댓글 삭제 성공. CommentId: {}, UserId: {}", commentId, userId);
+    log.info("댓글 삭제 성공. CommentId: {}", commentId);
   }
 
   @Transactional

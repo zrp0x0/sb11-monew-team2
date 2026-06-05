@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,10 +48,9 @@ public class UserController {
     @ResponseStatus(HttpStatus.OK)
     public UserDto updateUser(
             @PathVariable UUID userId,
-            @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId,
             @Valid @RequestBody UserUpdateRequest request
     ) {
         log.info("사용자 정보 수정 요청 시작. UserId: {}", userId);
-        return userService.update(userId, requestUserId, request);
+        return userService.update(userId, request);
     }
 }

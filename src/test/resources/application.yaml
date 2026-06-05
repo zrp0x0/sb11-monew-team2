@@ -1,4 +1,6 @@
 spring:
+  flyway:
+    enabled: false
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/monew_test}
     username: ${SPRING_DATASOURCE_USERNAME:user}
@@ -13,6 +15,21 @@ spring:
         format_sql: true
         default_batch_fetch_size: 100
 
+  batch:
+    jdbc:
+      initialize-schema: always # 테스트 시 배치 전용 테이블(6개)을 자동으로 생성
+    job:
+      enabled: false # 테스트 시 서버 구동 시 배치가 자동으로 도는 것을 방지
+
+batch:
+  chunk-size: 3
+  comment:
+    hard-delete:
+      batch-size: 10
+
+scheduling:
+  enabled: false # 테스트 시 스케줄러 끔
+
 logging:
   level:
     root: info
@@ -23,9 +40,3 @@ external-api:
     url: https://openapi.naver.com
     client-id: ${NAVER_CLIENT_ID:your_client_id}
     client-secret: ${NAVER_CLIENT_SECRET:your_client_secret}
-
-batch:
-  comment:
-    hard-delete:
-      batch-size: 10
-

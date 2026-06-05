@@ -7,5 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ArticleInterestRepository extends JpaRepository<ArticleInterest, UUID> {
 
-    List<ArticleInterest> findByArticleIdIn(List<UUID> articleIds);
+  List<ArticleInterest> findByArticleIdIn(List<UUID> articleIds);
+
+  void deleteByInterestId(UUID interestId);
 }
