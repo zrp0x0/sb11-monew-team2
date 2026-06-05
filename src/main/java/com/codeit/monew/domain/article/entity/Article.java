@@ -74,6 +74,17 @@ public class Article extends BaseSoftDeleteEntity {
     return new Article(source, sourceUrl, title, summary, publishedAt);
   }
 
+  public static Article restore(UUID id, ArticleSource source, String sourceUrl, String title, String summary, LocalDateTime publishedAt) {
+    Article article = new Article();
+    article.id = id;
+    article.source = source;
+    article.sourceUrl = sourceUrl;
+    article.title = title;
+    article.summary = summary;
+    article.publishedAt = publishedAt;
+    return article;
+  }
+
   public void increaseViewCount() {
     if (this.viewCount == Long.MAX_VALUE) {
       return;

@@ -10,6 +10,7 @@ import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
+import jakarta.persistence.EntityManager;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -38,6 +39,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest
 @ActiveProfiles("test")
 public class ArticleRestoreBatchConfigTest {
+
+  @Autowired
+  private EntityManager em;
 
   @Autowired
   private JobLauncherTestUtils jobLauncherTestUtils;
@@ -107,6 +111,7 @@ public class ArticleRestoreBatchConfigTest {
 
     //when
     JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
+    em.clear();
 
     //then
     assertThat(jobExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
@@ -159,6 +164,7 @@ public class ArticleRestoreBatchConfigTest {
 
     // when
     JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
+    em.clear();
 
     // then
     assertThat(jobExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestUpdateRequest;
@@ -51,6 +52,9 @@ public class InterestServiceTest {
 
   @Mock
   private SubscriptionRepository subscriptionRepository;
+
+  @Mock
+  private ArticleInterestRepository articleInterestRepository;
 
   @InjectMocks
   private InterestService interestService;
@@ -260,6 +264,7 @@ public class InterestServiceTest {
 
     //then
     verify(subscriptionRepository, times(1)).deleteByInterestId(interestId);
+    verify(articleInterestRepository, times(1)).deleteByInterestId(interestId);
     verify(interestRepository, times(1)).deleteById(interestId);
   }
 
