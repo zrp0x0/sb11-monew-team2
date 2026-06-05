@@ -72,10 +72,9 @@ public class CommentController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @DeleteMapping("/{commentId}")
   public void deleteComment(
-      @PathVariable UUID commentId,
-      @RequestHeader("Monew-Request-User-ID") UUID requestUserId
+      @PathVariable UUID commentId
   ) {
-    commentService.deleteComment(commentId, requestUserId);
+    commentService.deleteComment(commentId);
   }
 
   @Operation(summary = "댓글 물리 삭제", description = "댓글을 물리적으로 삭제합니다.")

@@ -36,8 +36,7 @@ public class CommentRepositoryImpl implements  CommentRepositoryCustom {
       where.and(
           comment.createdAt.lt(cursorCreatedAt)
               .or(comment.createdAt.eq(cursorCreatedAt)
-              .and(comment.id.lt(cursorId)))
-      );
+                  .and(comment.id.lt(cursorId))));
     } else if (orderBy == CommentOrderBy.likeCount && cursorLikeCount != null && cursorCreatedAt != null) {
       where.and(
           comment.likeCounts.lt(cursorLikeCount)
