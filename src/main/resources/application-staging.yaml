@@ -27,3 +27,6 @@ logging:
   level:
     root: info
     com.codeit.monew: info
+
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
