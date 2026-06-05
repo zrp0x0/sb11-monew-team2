@@ -485,11 +485,9 @@ public class CommentServiceTest {
       Comment comment = mock(Comment.class);
 
       given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
-      given(comment.getUser()).willReturn(user);
       given(comment.getArticle()).willReturn(article);
-      given(user.getId()).willReturn(userId);
 
-      commentService.deleteComment(commentId, userId);
+      commentService.deleteComment(commentId);
 
       then(comment).should().softDelete();
       then(article).should().decreaseCommentCount();
@@ -502,30 +500,10 @@ public class CommentServiceTest {
 
       given(commentRepository.findById(commentId)).willReturn(Optional.empty());
 
-      assertThatThrownBy(() -> commentService.deleteComment(commentId, userId))
+      assertThatThrownBy(() -> commentService.deleteComment(commentId))
           .isInstanceOf(CommentException.class)
           .extracting("errorCode")
           .isEqualTo(CommentErrorCode.COMMENT_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("댓글 작성자가 아닐 경우 CommentException을 던짐")
-    void deleteComment_IsNotCommentOwner_ThrowsCommentException() {
-      UUID commentId = UUID.randomUUID();
-      UUID otherUserId = UUID.randomUUID();
-
-      Comment comment = mock(Comment.class);
-
-      given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
-      given(comment.getUser()).willReturn(user);
-      given(user.getId()).willReturn(userId);
-
-      assertThatThrownBy(() -> commentService.deleteComment(commentId, otherUserId))
-          .isInstanceOf(CommentException.class)
-          .extracting("errorCode")
-          .isEqualTo(CommentErrorCode.COMMENT_UNAUTHORIZED);
-
-      then(comment).should(never()).softDelete();
     }
   }
 
