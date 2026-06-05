@@ -1,11 +1,11 @@
 package com.codeit.monew.domain.article.controller;
 
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
+import com.codeit.monew.domain.article.dto.request.CursorPageResponseDate;
 import com.codeit.monew.domain.article.dto.response.ArticleDto;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.service.ArticleService;
 import com.codeit.monew.domain.articleView.dto.response.ArticleViewDto;
-import com.codeit.monew.global.dto.CursorPageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,41 +38,51 @@ public class ArticleController {
 
     @Operation(summary = "뉴스 기사 목록 조회", description = "조건에 맞는 뉴스 기사 목록을 조회합니다.")
     @GetMapping
-    public CursorPageResponse<ArticleDto> searchArticles(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) UUID interestId,
-            @RequestParam(required = false) List<ArticleSource> sourceIn,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime publishDateFrom,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime publishDateTo,
-            @RequestParam String orderBy,
-            @RequestParam String direction,
-            @RequestParam(required = false) String cursor,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime after,
-            @RequestParam int limit,
-            @RequestHeader("Monew-Request-User-ID") UUID requestUserId
+    public CursorPageResponseDate<ArticleDto> searchArticles(
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) UUID interestId,
+        @RequestParam(required = false) List<ArticleSource> sourceIn,
+        @RequestParam(required = false)
+        @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS") // 패턴 일치
+        LocalDateTime publishDateFrom,
+        @RequestParam(required = false)
+        @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS") // 패턴 일치
+        LocalDateTime publishDateTo,
+        @RequestParam(required = false, defaultValue = "publishDate") String orderBy,
+        // 필수 해제 및 기본값 지정
+        @RequestParam(required = false, defaultValue = "DESC") String direction,
+        // 필수 해제 및 기본값 지정
+        @RequestParam(required = false) String cursor,
+        @RequestParam(required = false)
+        @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS") // 보조 커서 정밀도 강제 고정
+        LocalDateTime after,
+        @RequestParam(defaultValue = "10") int limit, // 기본값 설정해 두면 프론트가 편해요!
+        @RequestHeader("Monew-Request-User-ID") UUID requestUserId
     ) {
+        log.info("=====================");
+        log.info("cursor: {}", cursor);
+        if (after != null) {
+            log.info("after: {}", after.toString());
+        } else {
+            log.info("after null");
+        }
+
         ArticleSearchRequest request = new ArticleSearchRequest(
-                keyword,
-                interestId,
-                sourceIn,
-                publishDateFrom,
-                publishDateTo,
-                orderBy,
-                direction,
-                cursor,
-                after,
-                limit,
-                requestUserId
+            keyword,
+            interestId,
+            sourceIn,
+            publishDateFrom,
+            publishDateTo,
+            orderBy,
+            direction,
+            cursor,
+            after,
+            limit,
+            requestUserId
         );
 
         log.info("뉴스 기사 목록 조회 요청. requestUserId: {}, orderBy: {}, direction: {}, limit: {}",
-                requestUserId, orderBy, direction, limit);
+            requestUserId, orderBy, direction, limit);
 
         return articleService.searchArticles(request);
     }
@@ -80,8 +90,8 @@ public class ArticleController {
     @Operation(summary = "기사 뷰 등록", description = "기사 뷰를 등록합니다.")
     @PostMapping("/{articleId}/article-views")
     public ArticleViewDto registerArticleView(
-            @PathVariable UUID articleId,
-            @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId
+        @PathVariable UUID articleId,
+        @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId
     ) {
         log.info("기사 뷰 등록 요청. articleId: {}, requestUserId: {}", articleId, requestUserId);
         return articleService.registerArticleView(articleId, requestUserId);
@@ -90,8 +100,8 @@ public class ArticleController {
     @Operation(summary = "뉴스 기사 단건 조회", description = "뉴스 기사 ID로 뉴스 기사 단건을 조회합니다.")
     @GetMapping("/{articleId}")
     public ArticleDto getArticle(
-            @PathVariable UUID articleId,
-            @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId
+        @PathVariable UUID articleId,
+        @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId
     ) {
         log.info("뉴스 기사 단건 조회 요청. articleId: {}, requestUserId: {}", articleId, requestUserId);
         return articleService.getArticle(articleId, requestUserId);
