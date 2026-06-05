@@ -10,7 +10,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface ArticleRepository extends JpaRepository<Article, UUID>, ArticleRepositoryCustom {
 
-    Optional<Article> findByIdAndDeletedAtIsNull(UUID articleId);
+  Optional<Article> findByIdAndDeletedAtIsNull(UUID articleId);
+
+  boolean existsBySourceUrl(String sourceUrl);
 
     List<Article> findBySourceUrlIn(List<String> sourceUrls);
 
