@@ -20,8 +20,9 @@ public record CursorPageResponseCommentDto(
     boolean hasNext = content.size() > size;
     List<CommentDto> result = hasNext ? content.subList(0, size) : content;
 
-    String nextCursor = hasNext && orderBy == CommentOrderBy.likeCount
-        ? String.valueOf(result.get(result.size() - 1).likeCount())
+    String nextCursor = hasNext
+        ? (orderBy == CommentOrderBy.likeCount ? String.valueOf(result.get(result.size() - 1).likeCount())
+        : result.get(result.size() - 1).id().toString())
         : null;
     LocalDateTime nextAfter = hasNext ? result.get(result.size() - 1).createdAt() : null;
 
