@@ -15,7 +15,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Slf4j
 @Service
@@ -59,28 +58,11 @@ public class UserService {
     }
 
     @Transactional
-    public UserDto update(UUID userId, String requestUserIdHeader, UserUpdateRequest request) {
-        UUID requestUserId = parseRequestUserId(requestUserIdHeader);
-        if (!userId.equals(requestUserId)) {
-            throw new UserException(UserErrorCode.USER_ACCESS_DENIED);
-        }
-
+    public UserDto update(UUID userId, UserUpdateRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
         user.updateNickname(request.nickname());
 
         return UserDto.from(user);
-    }
-
-    private UUID parseRequestUserId(String requestUserIdHeader) {
-        if (!StringUtils.hasText(requestUserIdHeader)) {
-            throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
-        }
-
-        try {
-            return UUID.fromString(requestUserIdHeader);
-        } catch (IllegalArgumentException e) {
-            throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
-        }
     }
 }
