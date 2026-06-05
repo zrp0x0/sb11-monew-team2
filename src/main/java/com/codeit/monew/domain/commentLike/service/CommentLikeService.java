@@ -42,7 +42,11 @@ public class CommentLikeService {
         CommentLike commentLike = new CommentLike(comment, user);
         commentLikeRepository.save(commentLike);
         comment.increaseLikeCount();
-        eventPublisher.publishEvent(NotificationCreateEvent.createByCommentLike(comment, user));
+
+        if (!comment.getUser().getId().equals(user.getId())) {
+            eventPublisher.publishEvent(NotificationCreateEvent.createByCommentLike(comment, user));
+        }
+
         return mapper(commentLike, comment, user);
     }
 
