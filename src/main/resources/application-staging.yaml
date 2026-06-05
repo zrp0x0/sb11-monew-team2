@@ -23,6 +23,18 @@ external-api:
     client-id: ${NAVER_CLIENT_ID}
     client-secret: ${NAVER_CLIENT_SECRET}
 
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region:
+      static: ap-northeast-2
+
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET_NAME}
+
 logging:
   level:
     root: info

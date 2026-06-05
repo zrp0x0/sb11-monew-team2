@@ -43,8 +43,7 @@ public class ArticleBackupBatchConfig {
   @Value("${batch.chunk-size:1000}")
   private int chunkSize; // 한 번에 DB에서 읽고 처리할 데이터의 양
 
-  // TODO: 환경변수에서 값을 가져오도록 세팅
-  @Value("${aws.s3.bucket:dummy-bucket}")
+  @Value("${aws.s3.bucket}")
   private String bucketName;
 
   @Bean
