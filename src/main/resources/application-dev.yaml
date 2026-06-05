@@ -6,11 +6,14 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
         default_batch_fetch_size: 100
+  batch:
+    job:
+      enabled: false # 서버가 켜질 때 배치가 자동으로 실행되는 것을 방지
 
 logging:
   level:

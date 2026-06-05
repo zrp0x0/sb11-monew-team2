@@ -1,6 +1,8 @@
 spring:
   application:
     name: P1_Monew
+  profiles:
+    active: dev
 
 management:
   endpoints:

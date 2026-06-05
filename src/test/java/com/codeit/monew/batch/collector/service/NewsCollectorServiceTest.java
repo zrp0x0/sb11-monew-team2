@@ -2,6 +2,7 @@ package com.codeit.monew.batch.collector.service;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import com.codeit.monew.domain.interest.repository.InterestRepository;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,7 +42,6 @@ class NewsCollectorServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Provider 리스트를 수동으로 주입
         newsCollectorService = new NewsCollectorService(
             interestRepository,
             newsSaveService,
@@ -63,30 +64,41 @@ class NewsCollectorServiceTest {
     }
 
     @Test
-    @DisplayName("서로 다른 공급자에서 동일한 URL의 기사가 수집될 경우, Map을 통해 단건화 처리되어 저장 서비스로 넘어간다.")
+    @DisplayName("동일한 URL의 기사가 수집될 경우, Map을 통해 관심사(interestIds)가 병합되어 저장 서비스로 넘어간다.")
     void collectNewsHourly_DuplicateUrls_DeDuplicatedBeforeSave() {
         // given
-        UUID interestId = UUID.randomUUID();
-        Interest interest = Interest.create("경제", List.of("주식"));
+        UUID interestId1 = UUID.randomUUID();
+        UUID interestId2 = UUID.randomUUID();
 
+        Interest interest = mock(Interest.class);
         when(interestRepository.findAll()).thenReturn(List.of(interest));
-        when(mockProvider1.getSource()).thenReturn(ArticleSource.NAVER);
-        when(mockProvider2.getSource()).thenReturn(ArticleSource.NAVER);
 
-        // 동일한 URL을 가진 가짜 수집 기사
-        CollectedNewsDto commonNews = new CollectedNewsDto(
+        // 두 공급자가 동일한 URL이지만 서로 다른 관심사 ID를 가진 기사를 반환한다고 가정
+        CollectedNewsDto newsFromProvider1 = new CollectedNewsDto(
             ArticleSource.NAVER, "https://news.url/1", "중복 기사", LocalDateTime.now(), "본문",
-            interestId
+            Set.of(interestId1)
+        );
+        CollectedNewsDto newsFromProvider2 = new CollectedNewsDto(
+            ArticleSource.NAVER, "https://news.url/1", "중복 기사", LocalDateTime.now(), "본문",
+            Set.of(interestId2)
         );
 
-        when(mockProvider1.fetchNews(interest)).thenReturn(List.of(commonNews));
-        when(mockProvider2.fetchNews(interest)).thenReturn(List.of(commonNews));
+        when(mockProvider1.fetchNews(interest)).thenReturn(List.of(newsFromProvider1));
+        when(mockProvider2.fetchNews(interest)).thenReturn(List.of(newsFromProvider2));
 
         // when
         newsCollectorService.collectNewsHourly();
 
         // then
-        // 중복이 제거되어 사이즈가 1인 리스트가 saveUniqueArticles로 넘어가는지 검증
-        verify(newsSaveService, times(1)).saveUniqueArticles(argThat(list -> list.size() == 1));
+        // 중복이 제거되어 사이즈가 1인 리스트가 넘어가며, 두 관심사 ID가 모두 병합되었는지 검증
+        verify(newsSaveService, times(1)).saveUniqueArticles(argThat(list -> {
+            if (list.size() != 1) {
+                return false;
+            }
+            CollectedNewsDto mergedDto = list.get(0);
+            return mergedDto.interestIds().contains(interestId1) &&
+                mergedDto.interestIds().contains(interestId2) &&
+                mergedDto.interestIds().size() == 2;
+        }));
     }
 }

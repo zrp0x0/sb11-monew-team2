@@ -2,13 +2,16 @@ package com.codeit.monew.batch.collector.service;
 
 import com.codeit.monew.batch.collector.provider.CollectedNewsDto;
 import com.codeit.monew.domain.article.entity.Article;
+import com.codeit.monew.domain.article.entity.ArticleInterest;
+import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
 import com.codeit.monew.domain.interest.entity.Interest;
 import com.codeit.monew.domain.interest.repository.InterestRepository;
-import com.codeit.monew.domain.notification.entity.NotificationResourceType;
 import com.codeit.monew.domain.notification.listener.NotificationCreateEvent;
 import com.codeit.monew.domain.subscription.repository.SubscriptionRepository;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,82 +31,129 @@ public class NewsSaveService {
 
     private final InterestRepository interestRepository;
     private final ArticleRepository articleRepository;
+    private final ArticleInterestRepository articleInterestRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-
-    /**
-     * 수집된 대량의 데이터를 가져와 닥 한 번만 DB를 조회해 중복을 제거한 뒤 일괄 저장함 외부 API 통신이 끝난 이후이므로 트랜잭션이 물려있지 않게 됨
-     */
     @Transactional
     public int saveUniqueArticles(List<CollectedNewsDto> candidates) {
         if (candidates.isEmpty()) {
             return 0;
         }
 
+        // 필요한 관심사(Interest) 엔티티들 한 번에 조회
+        Set<UUID> allInterestIds = candidates.stream()
+            .flatMap(dto -> dto.interestIds().stream())
+            .collect(Collectors.toSet());
+        Map<UUID, Interest> interestMap = interestRepository.findAllById(allInterestIds).stream()
+            .collect(Collectors.toMap(Interest::getId, i -> i));
+
+        // 수집된 URL 목록 추출 및 500개씩 분할 조회
         List<String> targetUrls = candidates.stream()
             .map(CollectedNewsDto::sourceUrl)
             .toList();
 
-        // 500개 단위 쪼개어 조회 (PostgreSQL 인덱스 최적화 및 파라미터 한도 해제)
-        Set<String> alreadySavedUrls = new HashSet<>();
+        Map<String, Article> existingArticleMap = new HashMap<>();
         int batchSize = 500;
         for (int i = 0; i < targetUrls.size(); i += batchSize) {
             List<String> subList = targetUrls.subList(i,
                 Math.min(i + batchSize, targetUrls.size()));
             List<Article> existingArticles = articleRepository.findBySourceUrlIn(subList);
             for (Article article : existingArticles) {
-                alreadySavedUrls.add(article.getSourceUrl());
+                existingArticleMap.put(article.getSourceUrl(), article);
             }
         }
 
-        List<Article> articlesToSave = new ArrayList<>();
-        List<CollectedNewsDto> newlySavedNewsList = new ArrayList<>();
+        // 기존 기사들의 이미 존재하는 매핑 정보 조회 (Unique 제약조건 위배 방지)
+        List<UUID> existingArticleIds = existingArticleMap.values().stream()
+            .map(Article::getId)
+            .toList();
+
+        Map<UUID, Set<UUID>> existingMappingMap = new HashMap<>();
+        if (!existingArticleIds.isEmpty()) {
+            List<ArticleInterest> existingMappings = articleInterestRepository.findByArticleIdIn(
+                existingArticleIds);
+            for (ArticleInterest ai : existingMappings) {
+                existingMappingMap.computeIfAbsent(ai.getArticle().getId(), k -> new HashSet<>())
+                    .add(ai.getInterest().getId());
+            }
+        }
+
+        List<Article> newArticlesToSave = new ArrayList<>();
+        List<ArticleInterest> newMappingsToSave = new ArrayList<>();
+        Map<UUID, Integer> newNotificationCountMap = new HashMap<>();
+
+        // 신규 기사만 먼저 생성하고 DB에 저장하여 ID를 확정
         for (CollectedNewsDto dto : candidates) {
-            if (alreadySavedUrls.contains(dto.sourceUrl())) {
-                continue;
+            Article article = existingArticleMap.get(dto.sourceUrl());
+            if (article == null) {
+                article = Article.create(dto.source(), dto.sourceUrl(), dto.title(), dto.summary(),
+                    dto.publishDate());
+                newArticlesToSave.add(article);
+                existingArticleMap.put(dto.sourceUrl(), article);
             }
-
-            Article article = Article.create(
-                dto.source(),
-                dto.sourceUrl(),
-                dto.title(),
-                dto.summary(),
-                dto.publishDate()
-            );
-            articlesToSave.add(article);
-            newlySavedNewsList.add(dto);
         }
 
-        if (!articlesToSave.isEmpty()) {
-            articleRepository.saveAll(articlesToSave);
-
-            // TODO: 알림
-            Map<UUID, List<CollectedNewsDto>> groupedByInterest = newlySavedNewsList.stream()
-                .collect(Collectors.groupingBy(CollectedNewsDto::interestId));
-
-            sendNotificationToSubscribers(groupedByInterest);
-
-            return articlesToSave.size();
+        // 신규 기사 선 영속화 (ID 생성)
+        if (!newArticlesToSave.isEmpty()) {
+            articleRepository.saveAll(newArticlesToSave);
+            articleRepository.flush(); // 즉시 DB에 쿼리
         }
 
-        return 0;
+        // ID가 모두 확정된 상태에서 매핑 작업 수행
+        for (CollectedNewsDto dto : candidates) {
+            Article article = existingArticleMap.get(dto.sourceUrl());
+            // 새로 저장되었거나 기존에 있던 기사의 ID 유무 확인
+            boolean isNewArticle = newArticlesToSave.contains(article);
+
+            for (UUID interestId : dto.interestIds()) {
+                Interest interest = interestMap.get(interestId);
+                if (interest == null) {
+                    continue;
+                }
+
+                if (!isNewArticle) {
+                    Set<UUID> mappedInterests = existingMappingMap.getOrDefault(article.getId(),
+                        Collections.emptySet());
+                    if (mappedInterests.contains(interestId)) {
+                        continue;
+                    }
+                }
+
+                newMappingsToSave.add(ArticleInterest.create(article, interest));
+                newNotificationCountMap.merge(interestId, 1, Integer::sum);
+
+                if (!isNewArticle) {
+                    existingMappingMap.computeIfAbsent(article.getId(), k -> new HashSet<>())
+                        .add(interestId);
+                }
+            }
+        }
+
+        // 매핑 정보 일괄 저장
+        if (!newMappingsToSave.isEmpty()) {
+            articleInterestRepository.saveAll(newMappingsToSave);
+        }
+
+        // 알림 처리
+        if (!newNotificationCountMap.isEmpty()) {
+            sendNotificationToSubscribers(newNotificationCountMap);
+        }
+
+        return newArticlesToSave.size();
     }
 
-    private void sendNotificationToSubscribers(
-        Map<UUID, List<CollectedNewsDto>> groupedByInterest) {
-
-        for (Map.Entry<UUID, List<CollectedNewsDto>> entry : groupedByInterest.entrySet()) {
+    private void sendNotificationToSubscribers(Map<UUID, Integer> notificationCountMap) {
+        for (Map.Entry<UUID, Integer> entry : notificationCountMap.entrySet()) {
             UUID interestId = entry.getKey();
-            int newArticleCount = entry.getValue().size();
+            int newArticleCount = entry.getValue();
 
             Interest interest = interestRepository.findById(interestId).orElse(null);
             if (interest == null) {
                 continue;
             }
 
-            List<UUID> subscriberIds = subscriptionRepository.findUserIdsByInterestId(
-                interestId);
+            List<UUID> subscriberIds = subscriptionRepository.findUserIdsByInterestId(interestId);
             if (subscriberIds.isEmpty()) {
                 continue;
             }
@@ -112,12 +162,10 @@ public class NewsSaveService {
                 interest.getName(), newArticleCount);
 
             for (UUID receiverId : subscriberIds) {
-                eventPublisher.publishEvent(new NotificationCreateEvent(
-                    receiverId,
-                    notificationContent,
-                    NotificationResourceType.ARTICLE, // 알림 종류 메타데이터
-                    interestId            // 알림 클릭 시 이동할 관심사 피드 ID
-                ));
+                eventPublisher.publishEvent(
+                    NotificationCreateEvent.createEventByArticleCollect(interest, newArticleCount,
+                        receiverId)
+                );
             }
 
             log.info("[관심사 수집 알림 이벤트 발행 완료] 관심사명: {}, 신규 기사: {}건, 발송 대상 구독자: {}명",
