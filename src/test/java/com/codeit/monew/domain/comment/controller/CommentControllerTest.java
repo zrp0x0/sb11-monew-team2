@@ -331,22 +331,14 @@ public class CommentControllerTest {
     @Test
     @DisplayName("정상 요청 시 204를 반환하고 서비스를 호출함")
     void deleteComment_success() throws Exception {
-      willDoNothing().given(commentService).deleteComment(COMMENT_ID, USER_ID);
+      willDoNothing().given(commentService).deleteComment(COMMENT_ID);
 
       mockMvc.perform(delete("/api/comments/{commentId}", COMMENT_ID)
           .header("Monew-Request-User-ID", USER_ID.toString()))
           .andDo(print())
           .andExpect(status().isNoContent());
 
-      verify(commentService).deleteComment(COMMENT_ID, USER_ID);
-    }
-
-    @Test
-    @DisplayName("Monew-Request-User-ID 헤더가 없으면 400을 반환함")
-    void deleteComment_missingHeader_returns400() throws Exception {
-      mockMvc.perform(delete("/api/comments/{commentId}", COMMENT_ID))
-          .andDo(print())
-          .andExpect(status().isBadRequest());
+      verify(commentService).deleteComment(COMMENT_ID);
     }
   }
 
