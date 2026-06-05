@@ -2,15 +2,9 @@
 .github
 .gradle
 .idea
-gradle
-src
+BOOT-INF
 
-build/classes
-build/generated
-build/reports
-build/resources
-build/test-results
-build/tmp
+build
 
 *.iml
 *.log
