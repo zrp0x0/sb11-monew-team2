@@ -69,6 +69,9 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: pass
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
           SPRING_BATCH_JOB_ENABLED: false
         run: |
           java -jar build/libs/*.jar --server.port=18081 > flyway-staging.log 2>&1 &

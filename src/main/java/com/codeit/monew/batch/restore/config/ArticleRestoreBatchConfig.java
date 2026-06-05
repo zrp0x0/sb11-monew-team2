@@ -48,8 +48,7 @@ public class ArticleRestoreBatchConfig {
   @Value("${batch.chunk-size:1000}")
   private int chunkSize;
 
-  // TODO: 환경변수에서 값을 가져오도록 세팅
-  @Value("${aws.s3.bucket:dummy-bucket}")
+  @Value("${aws.s3.bucket}")
   private String bucketName;
 
   private static final String TEMP_FILE_PATH_KEY = "TEMP_FILE_PATH";
