@@ -24,7 +24,7 @@ public class CommentHardDeleteBatchJob {
   private int batchsize;
 
   @Transactional
-  @Scheduled(cron = "0 0 2 * * *") // 매일 새벽 2시
+  @Scheduled(cron = "0 0 2 * * *", zone = "${scheduling.zone:Asia/Seoul}") // 매일 새벽 2시
   public void execute() {
     LocalDateTime threshold = LocalDateTime.now().minusDays(7);
     int totalDeleted = 0;

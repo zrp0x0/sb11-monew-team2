@@ -13,6 +13,9 @@ RUN ./gradlew clean bootJar --no-daemon -x test
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
+ENV TZ=Asia/Seoul
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Seoul"
+
 RUN addgroup -S monew && adduser -S monew -G monew
 
 COPY --from=build /app/build/libs/*.jar app.jar

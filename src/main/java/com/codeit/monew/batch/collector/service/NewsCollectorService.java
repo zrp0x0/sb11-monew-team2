@@ -26,7 +26,7 @@ public class NewsCollectorService {
     private final NewsSaveService newsSaveService;
     private final List<NewsProvider> newsProviders;
 
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 0 * * * *", zone = "${scheduling.zone:Asia/Seoul}")
     public void collectNewsHourly() {
         MDC.put("traceId", "BATCH-" + UUID.randomUUID().toString().substring(0, 8));
         log.info("[뉴스 수집 배치 시작] 다중 공급자 기반 시간당 뉴스 통합 배치를 시작합니다.");
