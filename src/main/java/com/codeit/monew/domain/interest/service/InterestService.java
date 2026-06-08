@@ -36,6 +36,9 @@ public class InterestService {
   private final SubscriptionRepository subscriptionRepository;
   private final ArticleInterestRepository articleInterestRepository;
 
+  private static final DateTimeFormatter CURSOR_DATE_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+
   @Transactional
   public InterestResponse createInterest(InterestRegisterRequest request) {
     log.debug("interest register 시작 - 입력값: {}", request);
@@ -116,13 +119,12 @@ public class InterestService {
 
     Interest lastInterest = interestList.get(interestList.size() - 1);
 
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
-
     String nextCursor = request.getOrderBy().equals("subscriberCount")
-        ? lastInterest.getSubscriberCount() + "_" + lastInterest.getCreatedAt().format(formatter) + "_" +lastInterest.getId()
+        ? lastInterest.getSubscriberCount() + "_" +lastInterest.getId()
         : lastInterest.getName();
 
-    String nextAfter = hasNext ? String.valueOf(lastInterest.getCreatedAt()) : null;
+    String nextAfter = hasNext ? lastInterest.getCreatedAt().format(CURSOR_DATE_FORMATTER) : null;
+
     log.debug("interest search 완료 - 응답 사이즈: {}, hasNext: {}", content.size(), hasNext);
 
     return new CursorPageResponse<InterestResponse>(

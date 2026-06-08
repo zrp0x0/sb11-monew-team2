@@ -59,58 +59,48 @@ public class InterestRepositoryImpl implements InterestRepositoryCustom {
 
   private BooleanExpression cursorCondition(InterestSearchRequest request) {
     String cursor = request.cursor();
-    LocalDateTime after = request.after(); // 현재 클라이언트에서 안보내주고 있는 상황
+    LocalDateTime after = request.after();
 
     if (cursor == null || cursor.isBlank()) {
       return null;
     }
 
     boolean isDesc = request.getDirection().equalsIgnoreCase("DESC");
+
     // 구독자 수 기준 정렬일 때
     if (request.getOrderBy().equals("subscriberCount")) {
+      if (after == null) {
+        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT, Map.of("after", "구독자 수 정렬 시 after 파라미터는 필수입니다."));
+      }
+
       String[] parts = cursor.split("_");
 
+      if (parts.length != 2) {
+        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT,
+            Map.of("cursor", cursor));
+      }
+
       long cursorCount;
-      LocalDateTime cursorCreatedAt;
       UUID cursorId;
 
       try {
-        // after 커서가 없을 경우
-        if (after == null) {
-          if (parts.length != 3) {
-            throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT,
-                Map.of("cursor", cursor));
-          }
-          cursorCount = Long.parseLong(parts[0]);
-          cursorCreatedAt = LocalDateTime.parse(parts[1]);
-          cursorId = UUID.fromString(parts[2]);
-        }
-        // after 커서가 있을 경우
-        else {
-          if (parts.length != 2) {
-            throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT,
-                Map.of("cursor", cursor));
-          }
-          cursorCount = Long.parseLong(parts[0]);
-          cursorCreatedAt = after;
-          cursorId = UUID.fromString(parts[1]);
-        }
+        cursorCount = Long.parseLong(parts[0]);
+        cursorId = UUID.fromString(parts[1]);
       } catch (Exception e) {
-        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT,
-            Map.of("cursor", cursor));
+        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT, Map.of("cursor", cursor));
       }
 
       if (isDesc) {
         return interest.subscriberCount.lt(cursorCount)
             .or(interest.subscriberCount.eq(cursorCount)
-                .and(interest.createdAt.lt(cursorCreatedAt)))
-            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(cursorCreatedAt))
+                .and(interest.createdAt.lt(after)))
+            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(after))
                 .and(interest.id.gt(cursorId)));
       } else {
         return interest.subscriberCount.gt(cursorCount)
             .or(interest.subscriberCount.eq(cursorCount)
-                .and(interest.createdAt.lt(cursorCreatedAt)))
-            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(cursorCreatedAt))
+                .and(interest.createdAt.lt(after)))
+            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(after))
                 .and(interest.id.gt(cursorId)));
       }
     }
