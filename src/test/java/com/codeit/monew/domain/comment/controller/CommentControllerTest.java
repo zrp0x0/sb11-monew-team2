@@ -14,12 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.codeit.monew.domain.comment.dto.CommentDto;
-import com.codeit.monew.domain.comment.dto.CommentOrderBy;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
+import com.codeit.monew.domain.comment.dto.CommentSearchRequest;
 import com.codeit.monew.domain.comment.dto.CommentUpdateRequest;
-import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
-import com.codeit.monew.domain.comment.dto.SortDirection;
 import com.codeit.monew.domain.comment.service.CommentService;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -138,12 +137,12 @@ public class CommentControllerTest {
   @DisplayName("댓글 목록 조회 - GET")
   class GetComments {
 
-    private CursorPageResponseCommentDto buildPageResponse(boolean hasNext) {
+    private CursorPageResponse<CommentDto> buildPageResponse(boolean hasNext) {
       CommentDto dto = buildCommentDto();
-      return new CursorPageResponseCommentDto(
+      return new CursorPageResponse<>(
           List.of(dto),
           hasNext ? COMMENT_ID.toString() : null,
-          hasNext ? NOW : null,
+          hasNext ? "2026-06-05T13:49:35.781650" : null,
           1,
           10L,
           hasNext
@@ -153,10 +152,9 @@ public class CommentControllerTest {
     @Test
     @DisplayName("정상적인 요청(커서 없음) 시 200과 페이지 응답을 반환함")
     void getComments_noCursor_success() throws Exception {
-      CursorPageResponseCommentDto response = buildPageResponse(false);
+      CursorPageResponse<CommentDto> response = buildPageResponse(false);
       given(commentService.getComments(
-          eq(ARTICLE_ID), eq(null), eq(null),
-          eq(10), eq(CommentOrderBy.createdAt), eq(SortDirection.DESC),
+          any(CommentSearchRequest.class),
           eq(USER_ID)
       )).willReturn(response);
 
@@ -171,29 +169,27 @@ public class CommentControllerTest {
           .andExpect(jsonPath("$.content").isArray())
           .andExpect(jsonPath("$.content[0].id").value(COMMENT_ID.toString()))
           .andExpect(jsonPath("$.totalElements").value(10))
-          .andExpect(jsonPath("$.hasNext").value(false))
-          .andExpect(jsonPath("$.nextCursor").doesNotExist());
+          .andExpect(jsonPath("$.hasNext").value(false));
     }
 
     @Test
     @DisplayName("커서가 있는 경우 200과 다음 커서를 포함한 응답을 반환함")
     void getComments_withCursor_success() throws Exception {
       String cursor = COMMENT_ID.toString();
-      CursorPageResponseCommentDto response = buildPageResponse(true);
+      CursorPageResponse<CommentDto> response = buildPageResponse(true);
       given(commentService.getComments(
-          eq(ARTICLE_ID), eq(cursor), any(LocalDateTime.class),
-          eq(5), eq(CommentOrderBy.createdAt), eq(SortDirection.ASC),
+          any(CommentSearchRequest.class),
           eq(USER_ID)
       )).willReturn(response);
 
       mockMvc.perform(get("/api/comments")
-          .param("articleId", ARTICLE_ID.toString())
-          .param("cursor", cursor)
-          .param("after", NOW.toString())
-          .param("limit", "5")
-          .param("orderBy", "createdAt")
-          .param("direction", "ASC")
-          .header("Monew-Request-User-ID", USER_ID.toString()))
+              .param("articleId", ARTICLE_ID.toString())
+              .param("cursor", cursor)
+              .param("after", "2026-06-05T13:49:35.781650")
+              .param("limit", "5")
+              .param("orderBy", "createdAt")
+              .param("direction", "DESC")
+              .header("Monew-Request-User-ID", USER_ID.toString()))
           .andDo(print())
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.hasNext").value(true))
@@ -203,10 +199,9 @@ public class CommentControllerTest {
     @Test
     @DisplayName("likeCount 기준 정렬 시 200을 반환함")
     void getComments_orderByLikeCount_success() throws Exception {
-      CursorPageResponseCommentDto response = buildPageResponse(false);
+      CursorPageResponse<CommentDto> response = buildPageResponse(false);
       given(commentService.getComments(
-          eq(ARTICLE_ID), eq(null), eq(null),
-          eq(10), eq(CommentOrderBy.likeCount), eq(SortDirection.DESC),
+          any(CommentSearchRequest.class),
           eq(USER_ID)
       )).willReturn(response);
 
@@ -218,6 +213,29 @@ public class CommentControllerTest {
           .header("Monew-Request-User-ID", USER_ID.toString()))
           .andDo(print())
           .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("likeCount 기준 커서가 있는 경우 200을 반환함")
+    void getComments_likeCount_withCursor_success() throws Exception {
+      String cursor = "3_" + COMMENT_ID;  // likeCount_uuid 형식
+      CursorPageResponse<CommentDto> response = buildPageResponse(true);
+      given(commentService.getComments(
+          any(CommentSearchRequest.class),
+          eq(USER_ID)
+      )).willReturn(response);
+
+      mockMvc.perform(get("/api/comments")
+              .param("articleId", ARTICLE_ID.toString())
+              .param("cursor", cursor)
+              .param("after", "2026-06-05T13:49:35.781650")
+              .param("limit", "5")
+              .param("orderBy", "likeCount")
+              .param("direction", "DESC")
+              .header("Monew-Request-User-ID", USER_ID.toString()))
+          .andDo(print())
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.hasNext").value(true));
     }
 
     @Test
