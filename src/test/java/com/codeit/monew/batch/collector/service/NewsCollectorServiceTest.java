@@ -50,10 +50,10 @@ class NewsCollectorServiceTest {
     }
 
     @Test
-    @DisplayName("등록된 관심사가 없으면, 공급자를 조회하지 않고 즉시 배치를 종료한다.")
+    @DisplayName("관심사가 없으면 공급자 호출 없이 뉴스 수집 배치를 종료한다")
     void collectNewsHourly_NoInterests_Terminated() {
         // given
-        when(interestRepository.findAll()).thenReturn(Collections.emptyList());
+        when(interestRepository.findAllWithKeywords()).thenReturn(Collections.emptyList());
 
         // when
         newsCollectorService.collectNewsHourly();
@@ -64,14 +64,14 @@ class NewsCollectorServiceTest {
     }
 
     @Test
-    @DisplayName("동일한 URL의 기사가 수집될 경우, Map을 통해 관심사(interestIds)가 병합되어 저장 서비스로 넘어간다.")
+    @DisplayName("동일한 URL의 기사는 하나로 합치고 관심사 ID를 병합해 저장한다")
     void collectNewsHourly_DuplicateUrls_DeDuplicatedBeforeSave() {
         // given
         UUID interestId1 = UUID.randomUUID();
         UUID interestId2 = UUID.randomUUID();
 
         Interest interest = mock(Interest.class);
-        when(interestRepository.findAll()).thenReturn(List.of(interest));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(interest));
 
         // 두 공급자가 동일한 URL이지만 서로 다른 관심사 ID를 가진 기사를 반환한다고 가정
         CollectedNewsDto newsFromProvider1 = new CollectedNewsDto(
