@@ -3,12 +3,13 @@ package com.codeit.monew.domain.article.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
-import com.codeit.monew.domain.article.dto.request.CursorPageResponseDate;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.global.config.QuerydslConfig;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,21 +41,27 @@ class ArticleRepositoryTest {
   @Autowired
   private ArticleRepository articleRepository;
 
+  private static final DateTimeFormatter CURSOR_DATE_FORMATTER = DateTimeFormatter.ofPattern(
+      "yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+
   @Test
-  @DisplayName("Upsert 쿼리 - 중복 기사(source_url)는 무시(Skip)되고 새로운 기사는 저장된다.")
+  @DisplayName("Upsert 쿼리 - 중복 기사(source_url)는 무시되고 새로운 기사는 저장됨")
   void upsertArticleSkipDuplicate_Success() {
     // given
     String targetUrl = "http://test.com/url";
 
-    Article existingArticle = Article.create(ArticleSource.NAVER, targetUrl, "기존 기사", "요약", LocalDateTime.now());
+    Article existingArticle = Article.create(ArticleSource.NAVER, targetUrl, "기존 기사", "요약",
+        LocalDateTime.now());
     articleRepository.save(existingArticle);
-    em.flush(); em.clear();
+    em.flush();
+    em.clear();
 
     Article duplicateArticle = Article.restore(
         UUID.randomUUID(), ArticleSource.NAVER, targetUrl, "중복 기사", "요약", LocalDateTime.now());
 
     Article newArticle = Article.restore(
-        UUID.randomUUID(), ArticleSource.NAVER, "http://new-url.com", "새 기사", "요약", LocalDateTime.now());
+        UUID.randomUUID(), ArticleSource.NAVER, "http://new-url.com", "새 기사", "요약",
+        LocalDateTime.now());
 
     // when
     int duplicateResult = articleRepository.upsertArticleSkipDuplicate(duplicateArticle);
@@ -63,13 +70,13 @@ class ArticleRepositoryTest {
     em.clear();
 
     // then
-    assertThat(duplicateResult).isEqualTo(0); // 중복이므로 0행 처리
-    assertThat(newResult).isEqualTo(1); // 새 기사이므로 1행 처리
+    assertThat(duplicateResult).isEqualTo(0); // 중복이므로 0행 처리함
+    assertThat(newResult).isEqualTo(1); // 새 기사이므로 1행 처리함
     assertThat(articleRepository.count()).isEqualTo(2);
   }
 
   @Test
-  @DisplayName("sourceIn 조건으로 뉴스 기사 목록 필터링")
+  @DisplayName("sourceIn 조건으로 뉴스 기사 목록을 필터링함")
   void searchArticles_filterBySourceIn() {
     // given
     Article naverArticle = Article.create(
@@ -105,7 +112,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content()).hasSize(1);
@@ -115,7 +122,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("keyword가 제목 또는 요약에 포함된 뉴스 기사 조회")
+  @DisplayName("keyword가 제목 또는 요약에 포함된 뉴스 기사를 조회함")
   void searchArticles_filterByKeyword() {
     // given
     Article matchedByTitle = Article.create(
@@ -159,7 +166,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content()).hasSize(2);
@@ -169,7 +176,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("경제적 범위 조건으로 뉴스 기사 목록 필터링")
+  @DisplayName("경제적 범위 조건으로 뉴스 기사 목록을 필터링함")
   void searchArticles_filterByPublishDateRange() {
     // given
     Article oldArticle = Article.create(
@@ -213,7 +220,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content()).hasSize(1);
@@ -221,7 +228,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("publishDate 기준 내림차순으로 뉴스 기사 목록 정렬")
+  @DisplayName("publishDate 기준 내림차순으로 뉴스 기사 목록을 정렬함")
   void searchArticles_orderByPublishDateDesc() {
     // given
     Article firstArticle = Article.create(
@@ -257,7 +264,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content())
@@ -266,7 +273,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("publishDate 기준 오름차순으로 뉴스 기사 목록 정렬")
+  @DisplayName("publishDate 기준 오름차순으로 뉴스 기사 목록을 정렬함")
   void searchArticles_orderByPublishDateAsc() {
     // given
     Article firstArticle = Article.create(
@@ -302,7 +309,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content())
@@ -311,7 +318,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("commentCount 기준 내림차순으로 뉴스 기사 목록 정렬")
+  @DisplayName("commentCount 기준 내림차순으로 뉴스 기사 목록을 정렬함")
   void searchArticles_orderByCommentCountDesc() {
     // given
     Article lowCommentArticle = Article.create(
@@ -350,7 +357,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content())
@@ -359,7 +366,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("commentCount 기준 오름차순으로 뉴스 기사 목록 정렬")
+  @DisplayName("commentCount 기준 오름차순으로 뉴스 기사 목록을 정렬함")
   void searchArticles_orderByCommentCountAsc() {
     // given
     Article lowCommentArticle = Article.create(
@@ -398,7 +405,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content())
@@ -407,7 +414,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("viewCount 기준 내림차순으로 뉴스 기사 목록 정렬")
+  @DisplayName("viewCount 기준 내림차순으로 뉴스 기사 목록을 정렬함")
   void searchArticles_orderByViewCountDesc() {
     // given
     Article lowViewArticle = Article.create(
@@ -446,7 +453,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content())
@@ -455,7 +462,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("viewCount 기준 오름차순으로 뉴스 기사 목록 정렬")
+  @DisplayName("viewCount 기준 오름차순으로 뉴스 기사 목록을 정렬함")
   void searchArticles_orderByViewCountAsc() {
     // given
     Article lowViewArticle = Article.create(
@@ -494,7 +501,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content())
@@ -503,7 +510,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("publishDate 커서를 사용해 다음 페이지를 조회한다")
+  @DisplayName("publishDate 커서를 사용해 다음 페이지를 조회함")
   void searchArticles_fetchNextPageByPublishDateCursor() {
     // given
     Article article1 = Article.create(
@@ -537,19 +544,23 @@ class ArticleRepositoryTest {
         "publishDate", "DESC", null, null, 2, UUID.randomUUID()
     );
 
-    CursorPageResponseDate<Article> firstPage = articleRepository.searchArticles(firstRequest);
+    CursorPageResponse<Article> firstPage = articleRepository.searchArticles(firstRequest);
 
-    // 💡 LocalDateTime.parse() 구문을 완전히 걷어내고 .nextAfter()를 다이렉트로 바인딩
+    // nextAfter 문자열 값을 파싱하여 LocalDateTime으로 바인딩함
+    LocalDateTime nextAfterTime = firstPage.nextAfter() != null
+        ? LocalDateTime.parse(firstPage.nextAfter(), CURSOR_DATE_FORMATTER)
+        : null;
+
     ArticleSearchRequest secondRequest = new ArticleSearchRequest(
         null, null, null, null, null,
         "publishDate", "DESC",
         firstPage.nextCursor(),
-        firstPage.nextAfter(),
+        nextAfterTime,
         2, UUID.randomUUID()
     );
 
     // when
-    CursorPageResponseDate<Article> secondPage = articleRepository.searchArticles(
+    CursorPageResponse<Article> secondPage = articleRepository.searchArticles(
         secondRequest);
 
     // then
@@ -569,7 +580,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("commentCount 커서를 사용해 다음 페이지를 조회한다")
+  @DisplayName("commentCount 커서를 사용해 다음 페이지를 조회함")
   void searchArticles_fetchNextPageByCommentCountCursor() {
     // given
     Article article1 = Article.create(
@@ -607,19 +618,23 @@ class ArticleRepositoryTest {
         "commentCount", "DESC", null, null, 2, UUID.randomUUID()
     );
 
-    CursorPageResponseDate<Article> firstPage = articleRepository.searchArticles(firstRequest);
+    CursorPageResponse<Article> firstPage = articleRepository.searchArticles(firstRequest);
 
-    // 💡 LocalDateTime.parse() 구문을 완전히 걷어내고 .nextAfter()를 다이렉트로 바인딩
+    // nextAfter 문자열 값을 파싱하여 LocalDateTime으로 바인딩함
+    LocalDateTime nextAfterTime = firstPage.nextAfter() != null
+        ? LocalDateTime.parse(firstPage.nextAfter(), CURSOR_DATE_FORMATTER)
+        : null;
+
     ArticleSearchRequest secondRequest = new ArticleSearchRequest(
         null, null, null, null, null,
         "commentCount", "DESC",
         firstPage.nextCursor(),
-        firstPage.nextAfter(),
+        nextAfterTime,
         2, UUID.randomUUID()
     );
 
     // when
-    CursorPageResponseDate<Article> secondPage = articleRepository.searchArticles(
+    CursorPageResponse<Article> secondPage = articleRepository.searchArticles(
         secondRequest);
 
     // then
@@ -635,7 +650,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("viewCount 커서를 사용해 다음 페이지를 조회한다")
+  @DisplayName("viewCount 커서를 사용해 다음 페이지를 조회함")
   void searchArticles_fetchNextPageByViewCountCursor() {
     // given
     Article article1 = Article.create(
@@ -673,19 +688,23 @@ class ArticleRepositoryTest {
         "viewCount", "DESC", null, null, 2, UUID.randomUUID()
     );
 
-    CursorPageResponseDate<Article> firstPage = articleRepository.searchArticles(firstRequest);
+    CursorPageResponse<Article> firstPage = articleRepository.searchArticles(firstRequest);
 
-    // 💡 LocalDateTime.parse() 구문을 완전히 걷어내고 .nextAfter()를 다이렉트로 바인딩
+    // nextAfter 문자열 값을 파싱하여 LocalDateTime으로 바인딩함
+    LocalDateTime nextAfterTime = firstPage.nextAfter() != null
+        ? LocalDateTime.parse(firstPage.nextAfter(), CURSOR_DATE_FORMATTER)
+        : null;
+
     ArticleSearchRequest secondRequest = new ArticleSearchRequest(
         null, null, null, null, null,
         "viewCount", "DESC",
         firstPage.nextCursor(),
-        firstPage.nextAfter(),
+        nextAfterTime,
         2, UUID.randomUUID()
     );
 
     // when
-    CursorPageResponseDate<Article> secondPage = articleRepository.searchArticles(
+    CursorPageResponse<Article> secondPage = articleRepository.searchArticles(
         secondRequest);
 
     // then
@@ -701,7 +720,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("limit보다 데이터가 많으면 hasNext가 true이고 limit 개수만 반환")
+  @DisplayName("limit보다 데이터가 많으면 hasNext가 true이고 limit 개수만 반환함")
   void searchArticles_hasNextByLimit() {
     // given
     Article article1 = Article.create(
@@ -745,7 +764,7 @@ class ArticleRepositoryTest {
     );
 
     // when
-    CursorPageResponseDate<Article> response = articleRepository.searchArticles(request);
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
 
     // then
     assertThat(response.content()).hasSize(2);
@@ -755,7 +774,7 @@ class ArticleRepositoryTest {
   }
 
   @Test
-  @DisplayName("삭제되지 않은 기사만 단건 조회")
+  @DisplayName("삭제되지 않은 기사만 단건 조회함")
   void findByIdAndDeletedAtIsNull_success() {
     // given
     Article article = Article.create(
