@@ -16,7 +16,6 @@ import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
