@@ -16,6 +16,7 @@ import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -115,8 +116,10 @@ public class InterestService {
 
     Interest lastInterest = interestList.get(interestList.size() - 1);
 
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+
     String nextCursor = request.getOrderBy().equals("subscriberCount")
-        ? lastInterest.getSubscriberCount() + "_" + lastInterest.getCreatedAt() + "_" +lastInterest.getId()
+        ? lastInterest.getSubscriberCount() + "_" + lastInterest.getCreatedAt().format(formatter) + "_" +lastInterest.getId()
         : lastInterest.getName();
 
     String nextAfter = hasNext ? String.valueOf(lastInterest.getCreatedAt()) : null;
