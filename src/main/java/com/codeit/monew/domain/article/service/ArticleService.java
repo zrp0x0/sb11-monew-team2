@@ -1,7 +1,6 @@
 package com.codeit.monew.domain.article.service;
 
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
-import com.codeit.monew.domain.article.dto.request.CursorPageResponseDate;
 import com.codeit.monew.domain.article.dto.response.ArticleDto;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
@@ -15,9 +14,11 @@ import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.exception.UserErrorCode;
 import com.codeit.monew.domain.user.exception.UserException;
 import com.codeit.monew.domain.user.repository.UserRepository;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,100 +29,111 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class ArticleService {
 
-    private final ArticleRepository articleRepository;
-    private final ArticleViewRepository articleViewRepository;
-    private final UserRepository userRepository;
+  private final ArticleRepository articleRepository;
+  private final ArticleViewRepository articleViewRepository;
+  private final UserRepository userRepository;
 
-    public List<String> getSources() {
-        return Arrays.stream(ArticleSource.values())
-            .map(Enum::name)
-            .toList();
+  public List<String> getSources() {
+    return Arrays.stream(ArticleSource.values())
+        .map(Enum::name)
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public CursorPageResponse<ArticleDto> searchArticles(ArticleSearchRequest request,
+      UUID requestUserId) {
+
+    CursorPageResponse<Article> articlePage = articleRepository.searchArticles(request);
+
+    if (articlePage.content().isEmpty()) {
+      return new CursorPageResponse<>(
+          Collections.emptyList(),
+          articlePage.nextCursor(),
+          articlePage.nextAfter(),
+          articlePage.size(),
+          articlePage.totalElements(),
+          articlePage.hasNext()
+      );
     }
 
-    @Transactional(readOnly = true)
-    public CursorPageResponseDate<ArticleDto> searchArticles(ArticleSearchRequest request) {
-        validateSearchRequest(request);
+    // N + 1 문제 해결
+    List<UUID> currentArticleIds = articlePage.content().stream()
+        .map(Article::getId)
+        .toList();
 
-        CursorPageResponseDate<Article> articlePage = articleRepository.searchArticles(request);
+    Set<UUID> viewedByMes = articleViewRepository.findViewedArticleIds(
+        requestUserId,
+        currentArticleIds
+    );
 
-        List<ArticleDto> content = articlePage.content()
-            .stream()
-            .map(article -> ArticleDto.from(article, false))
-            .toList();
+    List<ArticleDto> content = articlePage.content()
+        .stream()
+        .map(article -> {
+          boolean viewedByMe = viewedByMes.contains(article.getId());
+          return ArticleDto.from(article, viewedByMe);
+        })
+        .toList();
 
-        return new CursorPageResponseDate<>(
-            content,
-            articlePage.nextCursor(),
-            articlePage.nextAfter(),
-            articlePage.size(),
-            articlePage.totalElements(),
-            articlePage.hasNext()
-        );
+    return new CursorPageResponse<>(
+        content,
+        articlePage.nextCursor(),
+        articlePage.nextAfter(),
+        articlePage.size(),
+        articlePage.totalElements(),
+        articlePage.hasNext()
+    );
+  }
+
+  @Transactional
+  public ArticleViewDto registerArticleView(UUID articleId, String requestUserIdHeader) {
+    UUID requestUserId = parseArticleViewRequestUserId(requestUserIdHeader);
+    User user = userRepository.findById(requestUserId)
+        .orElseThrow(() -> new UserException(UserErrorCode.INVALID_CREDENTIALS));
+    Article article = articleRepository.findById(articleId)
+        .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
+
+    return articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId)
+        .map(ArticleViewDto::from)
+        .orElseGet(() -> {
+          ArticleView articleView = articleViewRepository.save(
+              ArticleView.create(user, article));
+          article.increaseViewCount();
+          return ArticleViewDto.from(articleView);
+        });
+  }
+
+  private UUID parseArticleViewRequestUserId(String requestUserIdHeader) {
+    if (!StringUtils.hasText(requestUserIdHeader)) {
+      throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
     }
 
-    @Transactional
-    public ArticleViewDto registerArticleView(UUID articleId, String requestUserIdHeader) {
-        UUID requestUserId = parseArticleViewRequestUserId(requestUserIdHeader);
-        User user = userRepository.findById(requestUserId)
-            .orElseThrow(() -> new UserException(UserErrorCode.INVALID_CREDENTIALS));
-        Article article = articleRepository.findById(articleId)
-            .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
+    try {
+      return UUID.fromString(requestUserIdHeader);
+    } catch (IllegalArgumentException e) {
+      throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
+    }
+  }
 
-        return articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId)
-            .map(ArticleViewDto::from)
-            .orElseGet(() -> {
-                ArticleView articleView = articleViewRepository.save(
-                    ArticleView.create(user, article));
-                article.increaseViewCount();
-                return ArticleViewDto.from(articleView);
-            });
+  @Transactional(readOnly = true)
+  public ArticleDto getArticle(UUID articleId, String requestUserId) {
+    parseArticleRequestUserId(requestUserId);
+
+    Article article = articleRepository.findByIdAndDeletedAtIsNull(articleId)
+        .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
+
+    // Todo: viewedByMe false로 두고 추후 고도화
+    return ArticleDto.from(article, false);
+  }
+
+  private UUID parseArticleRequestUserId(String requestUserId) {
+    if (!StringUtils.hasText(requestUserId)) {
+      throw new ArticleException(ArticleErrorCode.REQUEST_USER_ID_REQUIRED);
     }
 
-    private UUID parseArticleViewRequestUserId(String requestUserIdHeader) {
-        if (!StringUtils.hasText(requestUserIdHeader)) {
-            throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
-        }
-
-        try {
-            return UUID.fromString(requestUserIdHeader);
-        } catch (IllegalArgumentException e) {
-            throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
-        }
+    try {
+      return UUID.fromString(requestUserId);
+    } catch (IllegalArgumentException e) {
+      throw new ArticleException(ArticleErrorCode.INVALID_REQUEST_USER_ID);
     }
-
-    private void validateSearchRequest(ArticleSearchRequest request) {
-        if (request.limit() <= 0) {
-            throw invalidSearchCondition("limit", request.limit());
-        }
-    }
-
-    private ArticleException invalidSearchCondition(String field, Object value) {
-        return new ArticleException(
-            ArticleErrorCode.INVALID_ARTICLE_SEARCH_CONDITION,
-            Map.of(field, String.valueOf(value))
-        );
-    }
-
-    @Transactional(readOnly = true)
-    public ArticleDto getArticle(UUID articleId, String requestUserId) {
-        parseArticleRequestUserId(requestUserId);
-
-        Article article = articleRepository.findByIdAndDeletedAtIsNull(articleId)
-            .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
-
-        // Todo: viewedByMe false로 두고 추후 고도화
-        return ArticleDto.from(article, false);
-    }
-
-    private UUID parseArticleRequestUserId(String requestUserId) {
-        if (!StringUtils.hasText(requestUserId)) {
-            throw new ArticleException(ArticleErrorCode.REQUEST_USER_ID_REQUIRED);
-        }
-
-        try {
-            return UUID.fromString(requestUserId);
-        } catch (IllegalArgumentException e) {
-            throw new ArticleException(ArticleErrorCode.INVALID_REQUEST_USER_ID);
-        }
-    }
+  }
 }

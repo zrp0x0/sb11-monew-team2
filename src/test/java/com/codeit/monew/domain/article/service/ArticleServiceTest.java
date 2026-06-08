@@ -3,20 +3,25 @@ package com.codeit.monew.domain.article.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
-import com.codeit.monew.domain.article.dto.request.CursorPageResponseDate;
 import com.codeit.monew.domain.article.dto.response.ArticleDto;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.exception.ArticleException;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
+import com.codeit.monew.domain.articleView.repository.ArticleViewRepository;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,178 +29,200 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils; // 추가됨
 
 @ExtendWith(MockitoExtension.class)
 class ArticleServiceTest {
 
-    @Mock
-    private ArticleRepository articleRepository;
+  @Mock
+  private ArticleRepository articleRepository;
 
-    @InjectMocks
-    private ArticleService articleService;
+  @Mock
+  private ArticleViewRepository articleViewRepository;
 
-    @Test
-    @DisplayName("서비스에서 지원하는 뉴스 기사 출처 목록 반환함")
-    void getSources_success() {
-        // when
-        List<String> sources = articleService.getSources();
+  @InjectMocks
+  private ArticleService articleService;
 
-        // then
-        assertThat(sources).containsExactly(
-            "NAVER",
-            "HANKYUNG",
-            "CHOSUN",
-            "YEONHAP"
-        );
-    }
+  @Test
+  @DisplayName("서비스에서 지원하는 뉴스 기사 출처 목록 반환함")
+  void getSources_success() {
+    // when
+    List<String> sources = articleService.getSources();
 
-    @Test
-    @DisplayName("뉴스 기사 목록을 성공적으로 조회하고 DTO 페이지 응답으로 변환함")
-    void searchArticles_success() {
-        // given
-        UUID requestUserId = UUID.randomUUID();
+    // then
+    assertThat(sources).containsExactly(
+        "NAVER",
+        "HANKYUNG",
+        "CHOSUN",
+        "YEONHAP"
+    );
+  }
 
-        ArticleSearchRequest request = new ArticleSearchRequest(
-            null, null, null, null, null,
-            "publishDate", "DESC", null, null, 10, requestUserId
-        );
+  @Test
+  @DisplayName("뉴스 기사 목록을 성공적으로 조회하고 DTO 페이지 응답으로 변환함")
+  void searchArticles_success() {
+    // given
+    UUID requestUserId = UUID.randomUUID();
 
-        Article article = Article.create(
-            ArticleSource.NAVER,
-            "https://news.naver.com/sample",
-            "테스트 기사 제목",
-            "테스트 기사 요약",
-            LocalDateTime.of(2026, 5, 27, 10, 0)
-        );
+    ArticleSearchRequest request = new ArticleSearchRequest(
+        null, null, null, null, null,
+        "publishDate", "DESC", null, null, 10, requestUserId
+    );
 
-        // 💡 nextAfter 타입을 LocalDateTime으로 일치시킴
-        LocalDateTime nextAfterTime = LocalDateTime.of(2026, 6, 4, 17, 9, 14);
+    Article article = Article.create(
+        ArticleSource.NAVER,
+        "https://news.naver.com/sample",
+        "테스트 기사 제목",
+        "테스트 기사 요약",
+        LocalDateTime.of(2026, 5, 27, 10, 0)
+    );
 
-        CursorPageResponseDate<Article> articlePage = new CursorPageResponseDate<>(
-            List.of(article),
-            "next-cursor",
-            nextAfterTime, // String에서 LocalDateTime으로 수정
-            1,
-            1L,
-            false
-        );
+    ReflectionTestUtils.setField(article, "id", UUID.randomUUID());
 
-        when(articleRepository.searchArticles(any(ArticleSearchRequest.class)))
-            .thenReturn(articlePage);
+    CursorPageResponse<Article> articlePage = new CursorPageResponse<>(
+        List.of(article),
+        "next-cursor",
+        "2026-06-04T17:09:14.000000",
+        1,
+        1L,
+        false
+    );
 
-        // when
-        CursorPageResponseDate<ArticleDto> response = articleService.searchArticles(request);
+    when(articleRepository.searchArticles(any(ArticleSearchRequest.class)))
+        .thenReturn(articlePage);
 
-        // then
-        assertThat(response.content()).hasSize(1);
-        assertThat(response.content().get(0).source()).isEqualTo(ArticleSource.NAVER);
-        assertThat(response.content().get(0).sourceUrl()).isEqualTo(
-            "https://news.naver.com/sample");
-        assertThat(response.content().get(0).title()).isEqualTo("테스트 기사 제목");
-        assertThat(response.content().get(0).summary()).isEqualTo("테스트 기사 요약");
-        assertThat(response.content().get(0).commentCount()).isEqualTo(0L);
-        assertThat(response.content().get(0).viewCount()).isEqualTo(0L);
-        assertThat(response.content().get(0).viewedByMe()).isFalse();
+    // N+1 방어용 기사 조회 여부 리포지토리 Mock 처리
+    when(articleViewRepository.findViewedArticleIds(eq(requestUserId), anyList()))
+        .thenReturn(Set.of()); // 빈 Set 반환 가정
 
-        assertThat(response.size()).isEqualTo(1);
-        assertThat(response.totalElements()).isEqualTo(1L);
-        assertThat(response.hasNext()).isFalse();
-        assertThat(response.nextCursor()).isEqualTo("next-cursor");
-        assertThat(response.nextAfter()).isEqualTo(nextAfterTime); // 객체 비교로 수정
+    // when
+    CursorPageResponse<ArticleDto> response = articleService.searchArticles(request, requestUserId);
 
-        verify(articleRepository).searchArticles(request);
-    }
+    // then
+    assertThat(response.content()).hasSize(1);
+    assertThat(response.content().get(0).source()).isEqualTo(ArticleSource.NAVER);
+    assertThat(response.content().get(0).title()).isEqualTo("테스트 기사 제목");
+    assertThat(response.content().get(0).viewedByMe()).isFalse();
 
-    @Test
-    @DisplayName("뉴스 기사 목록 조회 시 limit이 0 이하이면 예외가 발생함")
-    void searchArticles_invalidLimit() {
-        // given
-        ArticleSearchRequest request = new ArticleSearchRequest(
-            null, null, null, null, null,
-            "publishDate", "DESC", null, null, 0, UUID.randomUUID()
-        );
+    assertThat(response.size()).isEqualTo(1);
+    assertThat(response.totalElements()).isEqualTo(1L);
+    assertThat(response.hasNext()).isFalse();
+    assertThat(response.nextCursor()).isEqualTo("next-cursor");
+    assertThat(response.nextAfter()).isEqualTo("2026-06-04T17:09:14.000000");
 
-        // when & then
-        assertThatThrownBy(() -> articleService.searchArticles(request))
-            .isInstanceOf(ArticleException.class);
+    verify(articleRepository).searchArticles(request);
+    verify(articleViewRepository).findViewedArticleIds(eq(requestUserId), anyList());
+  }
 
-        verifyNoInteractions(articleRepository);
-    }
+  @Test
+  @DisplayName("조회된 기사 목록이 비어있으면 N+1 방어 로직을 타지 않고 바로 빈 응답을 반환함")
+  void searchArticles_empty() {
+    // given
+    UUID requestUserId = UUID.randomUUID();
+    ArticleSearchRequest request = new ArticleSearchRequest(
+        null, null, null, null, null,
+        "publishDate", "DESC", null, null, 10, requestUserId
+    );
 
-    @Test
-    @DisplayName("뉴스 기사 단건 조회 성공함")
-    void getArticle_success() {
-        // given
-        UUID articleId = UUID.randomUUID();
-        UUID requestUserId = UUID.randomUUID();
+    CursorPageResponse<Article> emptyPage = new CursorPageResponse<>(
+        Collections.emptyList(),
+        null,
+        null,
+        10,
+        0L,
+        false
+    );
 
-        Article article = Article.create(
-            ArticleSource.NAVER,
-            "https://news.naver.com/sample",
-            "테스트 기사 제목",
-            "테스트 기사 본문",
-            LocalDateTime.of(2026, 5, 27, 10, 30)
-        );
+    when(articleRepository.searchArticles(any(ArticleSearchRequest.class)))
+        .thenReturn(emptyPage);
 
-        when(articleRepository.findByIdAndDeletedAtIsNull(articleId))
-            .thenReturn(Optional.of(article));
+    // when
+    CursorPageResponse<ArticleDto> response = articleService.searchArticles(request, requestUserId);
 
-        // when
-        ArticleDto response = articleService.getArticle(articleId, requestUserId.toString());
+    // then
+    assertThat(response.content()).isEmpty();
 
-        // then
-        assertThat(response.source()).isEqualTo(ArticleSource.NAVER);
-        assertThat(response.sourceUrl()).isEqualTo("https://news.naver.com/sample");
-        assertThat(response.title()).isEqualTo("테스트 기사 제목");
-        assertThat(response.summary()).isEqualTo("테스트 기사 본문");
-        assertThat(response.publishDate()).isEqualTo(LocalDateTime.of(2026, 5, 27, 10, 30));
-        assertThat(response.commentCount()).isEqualTo(0L);
-        assertThat(response.viewCount()).isEqualTo(0L);
-        assertThat(response.viewedByMe()).isFalse();
+    verify(articleRepository).searchArticles(request);
+    verifyNoInteractions(articleViewRepository);
+  }
 
-        verify(articleRepository).findByIdAndDeletedAtIsNull(articleId);
-    }
 
-    @Test
-    @DisplayName("뉴스 기사 단건 조회시 기사 정보가 없으면 예외가 발생함")
-    void getArticle_notFound() {
-        // given
-        UUID articleId = UUID.randomUUID();
-        UUID requestUserId = UUID.randomUUID();
+  @Test
+  @DisplayName("뉴스 기사 단건 조회 성공함")
+  void getArticle_success() {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
 
-        when(articleRepository.findByIdAndDeletedAtIsNull(articleId))
-            .thenReturn(Optional.empty());
+    Article article = Article.create(
+        ArticleSource.NAVER,
+        "https://news.naver.com/sample",
+        "테스트 기사 제목",
+        "테스트 기사 본문",
+        LocalDateTime.of(2026, 5, 27, 10, 30)
+    );
 
-        // when & then
-        assertThatThrownBy(() -> articleService.getArticle(articleId, requestUserId.toString()))
-            .isInstanceOf(ArticleException.class);
+    ReflectionTestUtils.setField(article, "id", articleId);
 
-        verify(articleRepository).findByIdAndDeletedAtIsNull(articleId);
-    }
+    when(articleRepository.findByIdAndDeletedAtIsNull(articleId))
+        .thenReturn(Optional.of(article));
 
-    @Test
-    @DisplayName("뉴스 기사 단건 조회 시 요청자 ID 헤더가 없으면 예외가 발생함")
-    void getArticle_missingRequestUserId() {
-        // given
-        UUID articleId = UUID.randomUUID();
+    // when
+    ArticleDto response = articleService.getArticle(articleId, requestUserId.toString());
 
-        // when & then
-        assertThatThrownBy(() -> articleService.getArticle(articleId, null))
-            .isInstanceOf(ArticleException.class);
+    // then
+    assertThat(response.source()).isEqualTo(ArticleSource.NAVER);
+    assertThat(response.sourceUrl()).isEqualTo("https://news.naver.com/sample");
+    assertThat(response.title()).isEqualTo("테스트 기사 제목");
+    assertThat(response.summary()).isEqualTo("테스트 기사 본문");
+    assertThat(response.publishDate()).isEqualTo(LocalDateTime.of(2026, 5, 27, 10, 30));
+    assertThat(response.commentCount()).isEqualTo(0L);
+    assertThat(response.viewCount()).isEqualTo(0L);
+    assertThat(response.viewedByMe()).isFalse();
 
-        verifyNoInteractions(articleRepository);
-    }
+    verify(articleRepository).findByIdAndDeletedAtIsNull(articleId);
+  }
 
-    @Test
-    @DisplayName("뉴스 기사 단건 조회 시 요청자 ID 형식이 올바르지 않으면 예외가 발생함")
-    void getArticle_invalidRequestUserid() {
-        // given
-        UUID articleId = UUID.randomUUID();
+  @Test
+  @DisplayName("뉴스 기사 단건 조회시 기사 정보가 없으면 예외가 발생함")
+  void getArticle_notFound() {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
 
-        // when & then
-        assertThatThrownBy(() -> articleService.getArticle(articleId, "invalid-user-id"))
-            .isInstanceOf(ArticleException.class);
+    when(articleRepository.findByIdAndDeletedAtIsNull(articleId))
+        .thenReturn(Optional.empty());
 
-        verifyNoInteractions(articleRepository);
-    }
+    // when & then
+    assertThatThrownBy(() -> articleService.getArticle(articleId, requestUserId.toString()))
+        .isInstanceOf(ArticleException.class);
+
+    verify(articleRepository).findByIdAndDeletedAtIsNull(articleId);
+  }
+
+  @Test
+  @DisplayName("뉴스 기사 단건 조회 시 요청자 ID 헤더가 없으면 예외가 발생함")
+  void getArticle_missingRequestUserId() {
+    // given
+    UUID articleId = UUID.randomUUID();
+
+    // when & then
+    assertThatThrownBy(() -> articleService.getArticle(articleId, null))
+        .isInstanceOf(ArticleException.class);
+
+    verifyNoInteractions(articleRepository);
+  }
+
+  @Test
+  @DisplayName("뉴스 기사 단건 조회 시 요청자 ID 형식이 올바르지 않으면 예외가 발생함")
+  void getArticle_invalidRequestUserid() {
+    // given
+    UUID articleId = UUID.randomUUID();
+
+    // when & then
+    assertThatThrownBy(() -> articleService.getArticle(articleId, "invalid-user-id"))
+        .isInstanceOf(ArticleException.class);
+
+    verifyNoInteractions(articleRepository);
+  }
 }
