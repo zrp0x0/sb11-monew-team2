@@ -17,6 +17,8 @@ management:
 scheduling:
   enabled: true
   zone: Asia/Seoul
+  pool-size: 4
+  thread-name-prefix: monew-scheduler-
 
 logging:
   level:
