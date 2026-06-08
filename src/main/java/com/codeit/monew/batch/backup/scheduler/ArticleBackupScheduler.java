@@ -2,7 +2,7 @@ package com.codeit.monew.batch.backup.scheduler;
 
 import com.codeit.monew.batch.exception.BatchErrorCode;
 import com.codeit.monew.batch.exception.BatchException;
-import com.codeit.monew.global.config.SchedulingConfig;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -12,22 +12,21 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@Import(SchedulingConfig.class)
 @RequiredArgsConstructor
 public class ArticleBackupScheduler {
 
   private final JobLauncher jobLauncher;
   private final Job articleBackupJob;
+  private final Clock schedulerClock;
 
-  @Scheduled(cron = "0 0 3 * * *")
+  @Scheduled(cron = "0 0 3 * * *", zone = "${scheduling.zone:Asia/Seoul}")
   public void runArticleBackupJob() {
-    String targetDate = LocalDate.now().minusDays(1)
+    String targetDate = LocalDate.now(schedulerClock).minusDays(1)
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
     JobParameters jobParameters = new JobParametersBuilder()
