@@ -27,7 +27,7 @@ public class SchedulingStatusLogger {
         .sum();
 
     log.info(
-        "[scheduler] enabled={}, zone={}, poolSize={}, registeredTasks={}",
+        "[스케줄러 상태] 활성화 여부={}, 시간대={}, 스레드 풀 크기={}, 등록된 작업 수={}",
         enabled,
         zone,
         poolSize,

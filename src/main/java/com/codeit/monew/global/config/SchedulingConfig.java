@@ -25,7 +25,7 @@ public class SchedulingConfig {
     scheduler.setWaitForTasksToCompleteOnShutdown(true);
     scheduler.setAwaitTerminationSeconds(30);
     scheduler.setRemoveOnCancelPolicy(true);
-    scheduler.setErrorHandler(error -> log.error("[scheduler] Scheduled task failed", error));
+    scheduler.setErrorHandler(error -> log.error("[스케줄러 오류] 예약 작업 실행 중 오류가 발생했습니다.", error));
     return scheduler;
   }
 }
