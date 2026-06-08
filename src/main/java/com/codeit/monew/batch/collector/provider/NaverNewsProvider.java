@@ -4,6 +4,7 @@ import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.interest.entity.Interest;
 import com.codeit.monew.infra.externalapi.naver.client.NaverNewsClient;
 import com.codeit.monew.infra.externalapi.naver.dto.NaverNewsResponse;
+import feign.FeignException;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -51,15 +52,17 @@ public class NaverNewsProvider implements NewsProvider {
                 naverClientId, naverClientSecret, combinedQuery, 10, 1, "date");
 
             if (response == null || response.items() == null) {
+                log.warn("[news-collector] 네이버 뉴스 응답이 비어 있습니다. interestId={}", interest.getId());
                 return Collections.emptyList();
             }
 
+            log.info("[news-collector] 네이버 뉴스 후보를 수집했습니다. interestId={}, keywordCount={}, itemCount={}",
+                interest.getId(), keywords.size(), response.items().size());
+
             return response.items().stream()
-                // 원문 링크(originallink)나 네이버 링크(link) 중 하나라도 있으면 통과
                 .filter(item -> (item.originallink() != null && !item.originallink().isBlank())
                     || (item.link() != null && !item.link().isBlank()))
                 .map(item -> {
-                    // Fallback 적용: originallink가 유효하면 우선 사용, 없으면 link 사용 - PR 반영
                     String targetUrl =
                         (item.originallink() != null && !item.originallink().isBlank())
                             ? item.originallink() : item.link();
@@ -70,13 +73,22 @@ public class NaverNewsProvider implements NewsProvider {
                         stripHtmlTags(item.title()),
                         parsePubDate(item.pubDate()),
                         stripHtmlTags(item.description()),
-                        Set.of(interest.getId()) // Set으로 감싸서 전달
+                        Set.of(interest.getId())
                     );
                 })
                 .toList();
+        } catch (FeignException e) {
+            log.error(
+                "[news-collector] 네이버 뉴스 API 호출에 실패했습니다. interestId={}, status={}, body={}",
+                interest.getId(),
+                e.status(),
+                truncate(e.contentUTF8()),
+                e
+            );
+            return Collections.emptyList();
         } catch (Exception e) {
-            log.error("[NaverNewsProvider] 뉴스 수집 중 예외 발생. 관심사 ID: {}, 원인: {}", interest.getId(),
-                e.getMessage());
+            log.error("[news-collector] 네이버 뉴스 수집 중 예외가 발생했습니다. interestId={}, errorMessage={}",
+                interest.getId(), e.getMessage());
             return Collections.emptyList();
         }
     }
@@ -101,5 +113,13 @@ public class NaverNewsProvider implements NewsProvider {
         } catch (Exception e) {
             return LocalDateTime.now();
         }
+    }
+
+    private String truncate(String value) {
+        if (value == null) {
+            return "";
+        }
+        int maxLength = 500;
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 }
