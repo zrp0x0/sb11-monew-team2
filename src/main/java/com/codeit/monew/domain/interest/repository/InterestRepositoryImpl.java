@@ -69,7 +69,10 @@ public class InterestRepositoryImpl implements InterestRepositoryCustom {
 
     // 구독자 수 기준 정렬일 때
     if (request.getOrderBy().equals("subscriberCount")) {
-      // 타이 브레이커를 위해 '_'로 합쳤던 cursor와 lastInterestId를 분리
+      if (after == null) {
+        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT, Map.of("after", "구독자 수 정렬 시 after 파라미터는 필수입니다."));
+      }
+
       String[] parts = cursor.split("_");
 
       if (parts.length != 2) {
@@ -79,32 +82,30 @@ public class InterestRepositoryImpl implements InterestRepositoryCustom {
 
       long cursorCount;
       UUID cursorId;
+
       try {
         cursorCount = Long.parseLong(parts[0]);
         cursorId = UUID.fromString(parts[1]);
-      } catch (IllegalArgumentException e) {
-        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT,
-            Map.of("cursor", cursor));
+      } catch (Exception e) {
+        throw new InterestException(InterestErrorCode.INVALID_CURSOR_FORMAT, Map.of("cursor", cursor));
       }
 
       if (isDesc) {
         return interest.subscriberCount.lt(cursorCount)
-            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.lt(after)))
+            .or(interest.subscriberCount.eq(cursorCount)
+                .and(interest.createdAt.lt(after)))
+            .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(after))
+                .and(interest.id.gt(cursorId)));
+      } else {
+        return interest.subscriberCount.gt(cursorCount)
+            .or(interest.subscriberCount.eq(cursorCount)
+                .and(interest.createdAt.lt(after)))
             .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(after))
                 .and(interest.id.gt(cursorId)));
       }
-
-      return interest.subscriberCount.gt(cursorCount)
-          .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.lt(after)))
-          .or(interest.subscriberCount.eq(cursorCount).and(interest.createdAt.eq(after))
-              .and(interest.id.gt(cursorId)));
     }
 
     // 이름 기준 정렬일 때
-    if (isDesc) {
-      return interest.name.lt(cursor);
-    } else {
-      return interest.name.gt(cursor);
-    }
+    return isDesc ? interest.name.lt(cursor) : interest.name.gt(cursor);
   }
 }
