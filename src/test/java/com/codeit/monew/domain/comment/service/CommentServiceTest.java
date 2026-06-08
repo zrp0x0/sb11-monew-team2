@@ -16,7 +16,6 @@ import com.codeit.monew.domain.comment.dto.CommentDto;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
 import com.codeit.monew.domain.comment.dto.CommentSearchRequest;
 import com.codeit.monew.domain.comment.dto.CommentUpdateRequest;
-import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
 import com.codeit.monew.domain.comment.entity.Comment;
 import com.codeit.monew.domain.comment.exception.CommentErrorCode;
 import com.codeit.monew.domain.comment.exception.CommentException;
@@ -25,6 +24,7 @@ import com.codeit.monew.domain.commentLike.entity.CommentLike;
 import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.repository.UserRepository;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -141,7 +141,7 @@ public class CommentServiceTest {
           new CommentDto(UUID.randomUUID(), articleId, UUID.randomUUID(), "tester", "testComment2", 0, false, LocalDateTime.now())
       );
 
-      CursorPageResponseCommentDto repoResult = new CursorPageResponseCommentDto(
+      CursorPageResponse<CommentDto> repoResult = new CursorPageResponse<>(
           commentDtos, null, null, 2, 2L, false
       );
 
@@ -150,7 +150,7 @@ public class CommentServiceTest {
       given(commentLikeRepository.findByUserIdAndCommentIdIn(eq(requestUserId), anyList()))
           .willReturn(List.of());
 
-      CursorPageResponseCommentDto result = commentService.getComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentService.getComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
@@ -159,7 +159,7 @@ public class CommentServiceTest {
     }
 
     @Test
-    @DisplayName("hasNext가 true이면 nextCursor가 존재")
+    @DisplayName("hasNext가 true이면 nextCursor와 nextAfter가 존재")
     void getComments_HasNext_ReturnsNextCursor() {
       UUID requestUserId = UUID.randomUUID();
 
@@ -172,8 +172,8 @@ public class CommentServiceTest {
           new CommentDto(UUID.randomUUID(), articleId, UUID.randomUUID(), "tester", "comment2", 0, false, LocalDateTime.now())
       );
 
-      CursorPageResponseCommentDto repoResult = new CursorPageResponseCommentDto(
-          commentDtos, "nextCursorValue", LocalDateTime.now(), 2, 3L, true
+      CursorPageResponse<CommentDto> repoResult = new CursorPageResponse<>(
+          commentDtos, "nextCursorValue", "2026-06-05T13:49:35.781650", 2, 3L, true
       );
 
       given(commentRepository.findComments(any(CommentSearchRequest.class), eq(requestUserId)))
@@ -181,7 +181,7 @@ public class CommentServiceTest {
       given(commentLikeRepository.findByUserIdAndCommentIdIn(eq(requestUserId), anyList()))
           .willReturn(List.of());
 
-      CursorPageResponseCommentDto result = commentService.getComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentService.getComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isTrue();
@@ -193,10 +193,11 @@ public class CommentServiceTest {
     @DisplayName("cursor가 있으면 다음 페이지를 조회")
     void getComments_WithCursor_ReturnsNextPage() {
       UUID requestUserId = UUID.randomUUID();
-      String cursor = "2026-06-05T13:49:35.781650_2026-06-05T13:49:35.781650_" + UUID.randomUUID();
+      String cursor = UUID.randomUUID().toString();
+      LocalDateTime after = LocalDateTime.now();
 
       CommentSearchRequest request = new CommentSearchRequest(
-          articleId, cursor, null, 2, "createdAt", "DESC"
+          articleId, cursor, after, 2, "createdAt", "DESC"
       );
 
       List<CommentDto> commentDtos = List.of(
@@ -204,8 +205,8 @@ public class CommentServiceTest {
           new CommentDto(UUID.randomUUID(), articleId, UUID.randomUUID(), "tester", "comment2", 0, false, LocalDateTime.now())
       );
 
-      CursorPageResponseCommentDto repoResult = new CursorPageResponseCommentDto(
-          commentDtos, null, null, 2, 0L, false
+      CursorPageResponse<CommentDto> repoResult = new CursorPageResponse<>(
+          commentDtos, null, null, 2, null, false
       );
 
       given(commentRepository.findComments(any(CommentSearchRequest.class), eq(requestUserId)))
@@ -213,7 +214,7 @@ public class CommentServiceTest {
       given(commentLikeRepository.findByUserIdAndCommentIdIn(eq(requestUserId), anyList()))
           .willReturn(List.of());
 
-      CursorPageResponseCommentDto result = commentService.getComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentService.getComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();
@@ -236,7 +237,7 @@ public class CommentServiceTest {
           new CommentDto(comment2Id, articleId, UUID.randomUUID(), "tester", "comment2", 0, false, LocalDateTime.now())
       );
 
-      CursorPageResponseCommentDto repoResult = new CursorPageResponseCommentDto(
+      CursorPageResponse<CommentDto> repoResult = new CursorPageResponse<>(
           commentDtos, null, null, 2, 2L, false
       );
 
@@ -245,7 +246,7 @@ public class CommentServiceTest {
       given(commentLikeRepository.findByUserIdAndCommentIdIn(eq(requestUserId), anyList()))
           .willReturn(List.of(comment1Id));
 
-      CursorPageResponseCommentDto result = commentService.getComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentService.getComments(request, requestUserId);
 
       assertThat(result.content().get(0).likedByMe()).isTrue();
       assertThat(result.content().get(1).likedByMe()).isFalse();
@@ -265,7 +266,7 @@ public class CommentServiceTest {
           new CommentDto(UUID.randomUUID(), articleId, UUID.randomUUID(), "tester", "comment2", 1, false, LocalDateTime.now())
       );
 
-      CursorPageResponseCommentDto repoResult = new CursorPageResponseCommentDto(
+      CursorPageResponse<CommentDto> repoResult = new CursorPageResponse<>(
           commentDtos, null, null, 2, 2L, false
       );
 
@@ -274,7 +275,7 @@ public class CommentServiceTest {
       given(commentLikeRepository.findByUserIdAndCommentIdIn(eq(requestUserId), anyList()))
           .willReturn(List.of());
 
-      CursorPageResponseCommentDto result = commentService.getComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentService.getComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.hasNext()).isFalse();

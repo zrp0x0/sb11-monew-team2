@@ -4,8 +4,8 @@ import com.codeit.monew.domain.comment.dto.CommentDto;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
 import com.codeit.monew.domain.comment.dto.CommentSearchRequest;
 import com.codeit.monew.domain.comment.dto.CommentUpdateRequest;
-import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
 import com.codeit.monew.domain.comment.service.CommentService;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -42,7 +42,7 @@ public class CommentController {
   @Operation(summary = "댓글 목록 조회", description = "댓글 목록을 조회합니다.")
   @ResponseStatus(HttpStatus.OK)
   @GetMapping
-  public CursorPageResponseCommentDto getComments(
+  public CursorPageResponse<CommentDto> getComments(
       @ModelAttribute @Valid CommentSearchRequest request,
       @RequestHeader("Monew-Request-User-ID") UUID requestUserId
   ) {

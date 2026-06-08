@@ -6,7 +6,6 @@ import com.codeit.monew.domain.comment.dto.CommentDto;
 import com.codeit.monew.domain.comment.dto.CommentRegisterRequest;
 import com.codeit.monew.domain.comment.dto.CommentSearchRequest;
 import com.codeit.monew.domain.comment.dto.CommentUpdateRequest;
-import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
 import com.codeit.monew.domain.comment.entity.Comment;
 import com.codeit.monew.domain.comment.exception.CommentErrorCode;
 import com.codeit.monew.domain.comment.exception.CommentException;
@@ -14,6 +13,7 @@ import com.codeit.monew.domain.comment.repository.CommentRepository;
 import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.repository.UserRepository;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -55,14 +55,14 @@ public class CommentService {
   }
 
   @Transactional(readOnly = true)
-  public CursorPageResponseCommentDto getComments(
+  public CursorPageResponse<CommentDto> getComments(
       CommentSearchRequest request,
       UUID requestUserId
   ) {
     log.info("댓글 목록 조회. ArticleId: {}, cursor: {}, after: {}, limit: {}, orderBy: {}, direction: {}",
         request.articleId(), request.cursor(), request.after(), request.getLimit(), request.getOrderBy(), request.getDirection());
 
-    CursorPageResponseCommentDto result = commentRepository.findComments(request, requestUserId);
+    CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
 
     List<UUID> commentIds = result.content().stream()
         .map(CommentDto::id)
@@ -85,7 +85,7 @@ public class CommentService {
         ))
         .toList();
 
-    return new CursorPageResponseCommentDto(
+    return new CursorPageResponse<>(
         updateDtos,
         result.nextCursor(),
         result.nextAfter(),

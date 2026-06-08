@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
+import com.codeit.monew.domain.comment.dto.CommentDto;
 import com.codeit.monew.domain.comment.dto.CommentSearchRequest;
-import com.codeit.monew.domain.comment.dto.CursorPageResponseCommentDto;
 import com.codeit.monew.domain.comment.entity.Comment;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.global.config.QueryDslTestConfig;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,9 +28,6 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")  // 추가
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 public class CommentRepositoryImplTest {
-
-  private static final DateTimeFormatter CURSOR_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
 
   @Autowired
   private TestEntityManager tem;
@@ -52,13 +49,11 @@ public class CommentRepositoryImplTest {
   }
 
   private String buildCreatedAtCursor(Comment comment) {
-    String formatted = comment.getCreatedAt().format(CURSOR_FORMATTER);
-    return formatted + "_" + formatted + "_" + comment.getId();
+    return comment.getId().toString();
   }
 
   private String buildLikeCountCursor(Comment comment) {
-    String formatted = comment.getCreatedAt().format(CURSOR_FORMATTER);
-    return comment.getLikeCounts() + "_" + formatted + "_" + comment.getId();
+    return comment.getLikeCounts() + "_" + comment.getId();
   }
 
   @Nested
@@ -78,13 +73,15 @@ public class CommentRepositoryImplTest {
           article.getId(), null, null, 2, "createdAt", "DESC"
       );
 
-      CursorPageResponseCommentDto result = commentRepository.findComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.content().get(0).content()).isEqualTo("Third");
       assertThat(result.content().get(1).content()).isEqualTo("Second");
       assertThat(result.hasNext()).isTrue();
-      assertThat(result.totalElements()).isEqualTo(3);
+      assertThat(result.totalElements()).isEqualTo(3L);
+      assertThat(result.nextCursor()).isNotNull();
+      assertThat(result.nextAfter()).isNotNull();
     }
 
     @Test
@@ -97,14 +94,16 @@ public class CommentRepositoryImplTest {
       tem.persistAndFlush(Comment.create(article, user, "third"));
 
       CommentSearchRequest request = new CommentSearchRequest(
-          article.getId(), buildCreatedAtCursor(c2), null, 10, "createdAt", "DESC"
+          article.getId(), buildCreatedAtCursor(c2), c2.getCreatedAt(), 10, "createdAt", "DESC"
       );
 
-      CursorPageResponseCommentDto result = commentRepository.findComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(1);
       assertThat(result.content().get(0).content()).isEqualTo("first");
       assertThat(result.hasNext()).isFalse();
+      assertThat(result.nextCursor()).isNull();
+      assertThat(result.nextAfter()).isNull();
     }
 
     @Test
@@ -118,10 +117,27 @@ public class CommentRepositoryImplTest {
           article.getId(), null, null, 3, "createdAt", "DESC"
       );
 
-      CursorPageResponseCommentDto result = commentRepository.findComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(3);
       assertThat(result.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("nextCursor와 nextAfter가 올바른 형식으로 반환됨")
+    void findComments_createdAt_nextCursorFormat() throws InterruptedException {
+      Comment c1 = tem.persistAndFlush(Comment.create(article, user, "first"));
+      Thread.sleep(10);
+      Comment c2 = tem.persistAndFlush(Comment.create(article, user, "second"));
+
+      CommentSearchRequest request = new CommentSearchRequest(
+          article.getId(), null, null, 1, "createdAt", "DESC"
+      );
+
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
+
+      assertThat(result.nextCursor()).isEqualTo(c2.getId().toString());
+      assertThat(result.nextAfter()).isNotNull();
     }
   }
 
@@ -151,12 +167,13 @@ public class CommentRepositoryImplTest {
           article.getId(), null, null, 2, "likeCount", "DESC"
       );
 
-      CursorPageResponseCommentDto result = commentRepository.findComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.content().get(0).content()).isEqualTo("second");
       assertThat(result.content().get(1).content()).isEqualTo("third");
       assertThat(result.hasNext()).isTrue();
+      assertThat(result.nextCursor()).isEqualTo(c3.getLikeCounts() + "_" +c3.getId());
     }
 
     @Test
@@ -180,10 +197,10 @@ public class CommentRepositoryImplTest {
       tem.persistAndFlush(c3);
 
       CommentSearchRequest request = new CommentSearchRequest(
-          article.getId(), buildLikeCountCursor(c3), null, 10, "likeCount", "DESC"
+          article.getId(), buildLikeCountCursor(c3), c3.getCreatedAt(), 10, "likeCount", "DESC"
       );
 
-      CursorPageResponseCommentDto result = commentRepository.findComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(1);
       assertThat(result.content().get(0).content()).isEqualTo("first");
@@ -206,7 +223,7 @@ public class CommentRepositoryImplTest {
           article.getId(), null, null, 10, "likeCount", "DESC"
       );
 
-      CursorPageResponseCommentDto result = commentRepository.findComments(request, requestUserId);
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
 
       assertThat(result.content()).hasSize(2);
       assertThat(result.content().get(0).content()).isEqualTo("second");
