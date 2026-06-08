@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
-import com.codeit.monew.domain.comment.dto.CommentOrderBy;
+import com.codeit.monew.domain.comment.dto.CommentDto;
+import com.codeit.monew.domain.comment.dto.CommentSearchRequest;
 import com.codeit.monew.domain.comment.entity.Comment;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.global.config.QueryDslTestConfig;
+import com.codeit.monew.global.dto.CursorPageResponse;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,6 +37,7 @@ public class CommentRepositoryImplTest {
 
   private User user;
   private Article article;
+  private UUID requestUserId;
 
   @BeforeEach
   void setUp() {
@@ -42,6 +45,15 @@ public class CommentRepositoryImplTest {
     article = tem.persistAndFlush(
         Article.create(ArticleSource.NAVER, "http://test.com", "title", "summary", LocalDateTime.now())
     );
+    requestUserId = user.getId();
+  }
+
+  private String buildCreatedAtCursor(Comment comment) {
+    return comment.getId().toString();
+  }
+
+  private String buildLikeCountCursor(Comment comment) {
+    return comment.getLikeCounts() + "_" + comment.getId();
   }
 
   @Nested
@@ -55,15 +67,21 @@ public class CommentRepositoryImplTest {
       Thread.sleep(10);
       tem.persistAndFlush(Comment.create(article, user, "Second"));
       Thread.sleep(10);
-      Comment c3 = tem.persistAndFlush(Comment.create(article, user, "Third"));
+      tem.persistAndFlush(Comment.create(article, user, "Third"));
 
-      List<Comment> result = commentRepository.findComments(
-          article.getId(), CommentOrderBy.createdAt, null, null, null, 2
+      CommentSearchRequest request = new CommentSearchRequest(
+          article.getId(), null, null, 2, "createdAt", "DESC"
       );
 
-      assertThat(result).hasSize(2);
-      assertThat(result.get(0).getContent()).isEqualTo("Third");
-      assertThat(result.get(1).getContent()).isEqualTo("Second");
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
+
+      assertThat(result.content()).hasSize(2);
+      assertThat(result.content().get(0).content()).isEqualTo("Third");
+      assertThat(result.content().get(1).content()).isEqualTo("Second");
+      assertThat(result.hasNext()).isTrue();
+      assertThat(result.totalElements()).isEqualTo(3L);
+      assertThat(result.nextCursor()).isNotNull();
+      assertThat(result.nextAfter()).isNotNull();
     }
 
     @Test
@@ -75,12 +93,17 @@ public class CommentRepositoryImplTest {
       Thread.sleep(10);
       tem.persistAndFlush(Comment.create(article, user, "third"));
 
-      List<Comment> result = commentRepository.findComments(
-          article.getId(), CommentOrderBy.createdAt, c2.getCreatedAt(), c2.getId(), null, 10
+      CommentSearchRequest request = new CommentSearchRequest(
+          article.getId(), buildCreatedAtCursor(c2), c2.getCreatedAt(), 10, "createdAt", "DESC"
       );
 
-      assertThat(result).hasSize(1);
-      assertThat(result.get(0).getContent()).isEqualTo("first");
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
+
+      assertThat(result.content()).hasSize(1);
+      assertThat(result.content().get(0).content()).isEqualTo("first");
+      assertThat(result.hasNext()).isFalse();
+      assertThat(result.nextCursor()).isNull();
+      assertThat(result.nextAfter()).isNull();
     }
 
     @Test
@@ -90,11 +113,31 @@ public class CommentRepositoryImplTest {
         tem.persistAndFlush(Comment.create(article, user, "comment" + i));
         Thread.sleep(10);
       }
-      List<Comment> result = commentRepository.findComments(
-          article.getId(), CommentOrderBy.createdAt, null, null, null, 3
+      CommentSearchRequest request = new CommentSearchRequest(
+          article.getId(), null, null, 3, "createdAt", "DESC"
       );
 
-      assertThat(result).hasSize(3);
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
+
+      assertThat(result.content()).hasSize(3);
+      assertThat(result.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("nextCursor와 nextAfter가 올바른 형식으로 반환됨")
+    void findComments_createdAt_nextCursorFormat() throws InterruptedException {
+      Comment c1 = tem.persistAndFlush(Comment.create(article, user, "first"));
+      Thread.sleep(10);
+      Comment c2 = tem.persistAndFlush(Comment.create(article, user, "second"));
+
+      CommentSearchRequest request = new CommentSearchRequest(
+          article.getId(), null, null, 1, "createdAt", "DESC"
+      );
+
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
+
+      assertThat(result.nextCursor()).isEqualTo(c2.getId().toString());
+      assertThat(result.nextAfter()).isNotNull();
     }
   }
 
@@ -120,13 +163,17 @@ public class CommentRepositoryImplTest {
       c3.increaseLikeCount();
       tem.persistAndFlush(c3);
 
-      List<Comment> result = commentRepository.findComments(
-          article.getId(), CommentOrderBy.likeCount, null, null, null, 2
+      CommentSearchRequest request = new CommentSearchRequest(
+          article.getId(), null, null, 2, "likeCount", "DESC"
       );
 
-      assertThat(result).hasSize(2);
-      assertThat(result.get(0).getContent()).isEqualTo("second");
-      assertThat(result.get(1).getContent()).isEqualTo("third");
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
+
+      assertThat(result.content()).hasSize(2);
+      assertThat(result.content().get(0).content()).isEqualTo("second");
+      assertThat(result.content().get(1).content()).isEqualTo("third");
+      assertThat(result.hasNext()).isTrue();
+      assertThat(result.nextCursor()).isEqualTo(c3.getLikeCounts() + "_" +c3.getId());
     }
 
     @Test
@@ -149,12 +196,15 @@ public class CommentRepositoryImplTest {
       c3.increaseLikeCount();
       tem.persistAndFlush(c3);
 
-      List<Comment> result = commentRepository.findComments(
-          article.getId(), CommentOrderBy.likeCount, c3.getCreatedAt(), null, c3.getLikeCounts(), 10
+      CommentSearchRequest request = new CommentSearchRequest(
+          article.getId(), buildLikeCountCursor(c3), c3.getCreatedAt(), 10, "likeCount", "DESC"
       );
 
-      assertThat(result).hasSize(1);
-      assertThat(result.get(0).getContent()).isEqualTo("first");
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
+
+      assertThat(result.content()).hasSize(1);
+      assertThat(result.content().get(0).content()).isEqualTo("first");
+      assertThat(result.hasNext()).isFalse();
     }
 
     @Test
@@ -169,13 +219,15 @@ public class CommentRepositoryImplTest {
       c2.increaseLikeCount();
       tem.persistAndFlush(c2);
 
-      List<Comment> result = commentRepository.findComments(
-          article.getId(), CommentOrderBy.likeCount, null, null, null, 10
+      CommentSearchRequest request = new CommentSearchRequest(
+          article.getId(), null, null, 10, "likeCount", "DESC"
       );
 
-      assertThat(result).hasSize(2);
-      assertThat(result.get(0).getContent()).isEqualTo("second");
-      assertThat(result.get(1).getContent()).isEqualTo("first");
+      CursorPageResponse<CommentDto> result = commentRepository.findComments(request, requestUserId);
+
+      assertThat(result.content()).hasSize(2);
+      assertThat(result.content().get(0).content()).isEqualTo("second");
+      assertThat(result.content().get(1).content()).isEqualTo("first");
     }
   }
 }
