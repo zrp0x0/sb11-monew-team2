@@ -48,8 +48,7 @@ public class ArticleRestoreBatchConfig {
   @Value("${batch.chunk-size:1000}")
   private int chunkSize;
 
-  // TODO: 환경변수에서 값을 가져오도록 세팅
-  @Value("${aws.s3.bucket:dummy-bucket}")
+  @Value("${aws.s3.bucket}")
   private String bucketName;
 
   private static final String TEMP_FILE_PATH_KEY = "TEMP_FILE_PATH";
@@ -104,7 +103,8 @@ public class ArticleRestoreBatchConfig {
         .listener(new StepExecutionListener() {
           @Override
           public @Nullable ExitStatus afterStep(StepExecution stepExecution) {
-            String tempPath = stepExecution.getJobExecution().getExecutionContext().getString(TEMP_FILE_PATH_KEY);
+            String tempPath = stepExecution.getJobExecution().getExecutionContext()
+                .getString(TEMP_FILE_PATH_KEY);
 
             if (tempPath != null) {
               File localTempFile = new File(tempPath);
@@ -144,15 +144,14 @@ public class ArticleRestoreBatchConfig {
 
   @Bean
   public ItemProcessor<ArticleBackupDto, Article> articleRestoreProcessor() {
-    return dto -> {
-      return Article.create(
-          dto.source(),
-          dto.sourceUrl(),
-          dto.title(),
-          dto.summary(),
-          dto.publishDate()
-      );
-    };
+    return dto -> Article.restore(
+        dto.id(),
+        dto.source(),
+        dto.sourceUrl(),
+        dto.title(),
+        dto.summary(),
+        dto.publishDate()
+    );
   }
 
   @Bean
@@ -163,19 +162,15 @@ public class ArticleRestoreBatchConfig {
     return articles -> {
       var jobContext = stepExecution.getJobExecution().getExecutionContext();
 
-      List<String> restoredIds = Optional.ofNullable((List<String>) jobContext.get("RESTORED_ARTICLE_IDS"))
+      List<String> restoredIds = Optional.ofNullable(
+              (List<String>) jobContext.get("RESTORED_ARTICLE_IDS"))
           .orElse(new ArrayList<>());
 
-      List<Article> articlesToSave = new ArrayList<>();
       for (Article article : articles) {
-        if (!articleRepository.existsBySourceUrl(article.getSourceUrl())) {
-          articlesToSave.add(article);
+        int updatedRows = articleRepository.upsertArticleSkipDuplicate(article);
+        if (updatedRows > 0) {
+          restoredIds.add(article.getId().toString());
         }
-      }
-
-      if (!articlesToSave.isEmpty()) {
-        List<Article> savedArticles = articleRepository.saveAll(articlesToSave);
-        savedArticles.forEach(a -> restoredIds.add(a.getId().toString()));
       }
 
       jobContext.put("RESTORED_ARTICLE_IDS", restoredIds);

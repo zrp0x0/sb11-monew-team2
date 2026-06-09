@@ -1,8 +1,9 @@
+server:
+  port: ${PORT:8080}
+
 spring:
   application:
     name: P1_Monew
-  profiles:
-    active: dev
 
 management:
   endpoints:
@@ -12,6 +13,12 @@ management:
   endpoint:
     health:
       show-details: never
+
+scheduling:
+  enabled: true
+  zone: Asia/Seoul
+  pool-size: 4
+  thread-name-prefix: monew-scheduler-
 
 logging:
   level:

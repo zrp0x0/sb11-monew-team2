@@ -49,6 +49,15 @@
     </logger>
   </springProfile>
 
+  <springProfile name="staging">
+    <root>
+      <appender-ref ref="CONSOLE"/>
+    </root>
+    <logger name="com.codeit.monew" additivity="false">
+      <appender-ref ref="CONSOLE"/>
+    </logger>
+  </springProfile>
+
   <springProfile name="prod">
     <root>
       <appender-ref ref="CONSOLE"/>

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestUpdateRequest;
@@ -25,6 +26,7 @@ import com.codeit.monew.domain.user.exception.UserException;
 import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,6 +45,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 public class InterestServiceTest {
 
+  // 테스트용 고정 시간 상수
+  private static final LocalDateTime TEST_AT = LocalDateTime.of(2026, 1, 1, 1, 1, 1);
+  private static final DateTimeFormatter CURSOR_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+
   @Mock
   private InterestRepository interestRepository;
 
@@ -51,6 +57,9 @@ public class InterestServiceTest {
 
   @Mock
   private SubscriptionRepository subscriptionRepository;
+
+  @Mock
+  private ArticleInterestRepository articleInterestRepository;
 
   @InjectMocks
   private InterestService interestService;
@@ -218,9 +227,9 @@ public class InterestServiceTest {
     //then
     assertThat(result.content()).hasSize(2);
     assertThat(result.nextCursor()).isEqualTo("농구");
-    assertThat(result.nextAfter()).isEqualTo(String.valueOf(interestB.getCreatedAt()));
-    // 날짜 형식(YYYY-MM-DD T HH:mm:ss...) 정규식에 맞는지 검증
-    assertThat(result.nextAfter()).matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*");
+
+    // 💡 TEST_AT을 사용한 검증
+    assertThat(result.nextAfter()).isEqualTo(TEST_AT.format(CURSOR_DATE_FORMATTER));
     assertThat(result.hasNext()).isTrue();
 
     assertThat(result.content().get(0).name()).isEqualTo("골프");
@@ -260,6 +269,7 @@ public class InterestServiceTest {
 
     //then
     verify(subscriptionRepository, times(1)).deleteByInterestId(interestId);
+    verify(articleInterestRepository, times(1)).deleteByInterestId(interestId);
     verify(interestRepository, times(1)).deleteById(interestId);
   }
 
@@ -288,7 +298,7 @@ public class InterestServiceTest {
 
     ReflectionTestUtils.setField(interest, "id", id);
     ReflectionTestUtils.setField(interest, "subscriberCount", subscriberCount);
-    ReflectionTestUtils.setField(interest, "createdAt", LocalDateTime.now());
+    ReflectionTestUtils.setField(interest, "createdAt", TEST_AT); // TEST_AT 사용
 
     return interest;
   }

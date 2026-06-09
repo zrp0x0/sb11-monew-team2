@@ -1,4 +1,6 @@
 spring:
+  flyway:
+    enabled: true
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -11,8 +13,32 @@ spring:
       hibernate:
         format_sql: false
         default_batch_fetch_size: 100
+  batch:
+    job:
+      enabled: false
+
+external-api:
+  naver:
+    url: ${NAVER_API_URL:https://openapi.naver.com}
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region:
+      static: ap-northeast-2
+
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET_NAME}
 
 logging:
   level:
     root: info
     com.codeit.monew: info
+
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
