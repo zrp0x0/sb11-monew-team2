@@ -1,8 +1,6 @@
 package com.codeit.monew.domain.article.collector;
 
-import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
-import com.codeit.monew.domain.article.repository.ArticleRepository;
 import java.io.StringReader;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -18,9 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringEscapeUtils;
 import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.core.parameters.P;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -30,65 +26,42 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
 @Slf4j
-@Service
+@Component
 @RequiredArgsConstructor
-public class RssArticleCollector {
+public class RssNewsProvider implements NewsProvider {
 
-    private static final String HANKYUNG_RSS_URL = "https://www.hankyung.com/feed/all-news";
-
-    private final ArticleRepository articleRepository;
     private final RestTemplateBuilder restTemplateBuilder;
+    private final HankyungRssProperties hankyungRssProperties;
 
-    public CollectResult collect() {
+    @Override
+    public ArticleSource source() {
+        return ArticleSource.HANKYUNG;
+    }
+
+    @Override
+    public List<CollectedArticle> collect() {
         String rssXml = fetchRssXml();
         List<RssItem> rssItems = parseRssItems(rssXml);
 
-        int savedCount = 0;
-        int skippedCount = 0;
-        int failedCount = 0;
-
-        for (RssItem item : rssItems) {
-            try {
-                Optional<Article> articleOptional = toArticle(item);
-
-                if (articleOptional.isEmpty()) {
-                    skippedCount++;
-                    continue;
-                }
-
-                Article article = articleOptional.get();
-
-                if (articleRepository.existsBySourceUrlIncludingDeleted(article.getSourceUrl())) {
-                    skippedCount++;
-                    continue;
-                }
-
-                articleRepository.save(article);
-                savedCount++;
-            } catch (DataIntegrityViolationException e) {
-                skippedCount++;
-                log.info("한국경제 RSS 중복 기사 저장 skip. link={}", item.link());
-            } catch (Exception e) {
-                failedCount++;
-                log.warn("한국경제 RSS 기사 저장 실패. title={}, link={}", item.title(), item.link(), e);
-            }
-        }
-
-        return new CollectResult(
-                rssItems.size(),
-                savedCount,
-                skippedCount,
-                failedCount
-        );
+        return rssItems.stream()
+                .map(this::toCollectedArticle)
+                .flatMap(Optional::stream)
+                .toList();
     }
 
     private String fetchRssXml() {
+        String rssUrl = hankyungRssProperties.getRssUrl();
+
+        if (!StringUtils.hasText(rssUrl)) {
+            throw new IllegalStateException("한국경제 RSS URL 설정이 필요합니다.");
+        }
+
         try {
             RestTemplate restTemplate = restTemplateBuilder.build();
-            String rssXml = restTemplate.getForObject(HANKYUNG_RSS_URL, String.class);
+            String rssXml = restTemplate.getForObject(rssUrl, String.class);
 
             if (!StringUtils.hasText(rssXml)) {
-                throw new IllegalArgumentException("한국경제 RSS 응답이 비어 있습니다.");
+                throw new IllegalStateException("한국경제 RSS 응답이 비어 있습니다.");
             }
 
             return rssXml;
@@ -137,21 +110,21 @@ public class RssArticleCollector {
         return nodeList.item(0).getTextContent();
     }
 
-    private Optional<Article> toArticle(RssItem item) {
+    private Optional<CollectedArticle> toCollectedArticle(RssItem item) {
         String title = cleanText(item.title());
         String sourceUrl = normalizeUrl(item.link());
         String summary = cleanText(item.description());
         Optional<LocalDateTime> publishedAt = parsePubDate(item.pubDate());
 
         if (!StringUtils.hasText(title)
-            || !StringUtils.hasText(sourceUrl)
-            || !StringUtils.hasText(summary)
-            || publishedAt.isEmpty()) {
+                || !StringUtils.hasText(sourceUrl)
+                || !StringUtils.hasText(summary)
+                || publishedAt.isEmpty()) {
             return Optional.empty();
         }
 
-        return Optional.of(Article.create(
-                ArticleSource.HANKYUNG,
+        return Optional.of(new CollectedArticle(
+                source(),
                 sourceUrl,
                 truncate(title, 500),
                 truncate(summary, 2000),
@@ -306,14 +279,6 @@ public class RssArticleCollector {
             String link,
             String description,
             String pubDate
-    ) {
-    }
-
-    public record CollectResult(
-            int totalCount,
-            int savedCount,
-            int skippedCount,
-            int failedCount
     ) {
     }
 }
