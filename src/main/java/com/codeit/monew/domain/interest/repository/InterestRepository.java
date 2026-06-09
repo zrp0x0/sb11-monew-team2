@@ -12,6 +12,9 @@ public interface InterestRepository extends JpaRepository<Interest, UUID>, Inter
 
   boolean existsByName(String name);
 
+  @Query("SELECT DISTINCT i FROM Interest i LEFT JOIN FETCH i.keywords")
+  List<Interest> findAllWithKeywords();
+
   @Query("SELECT i FROM Interest i WHERE LENGTH(i.name) BETWEEN :minLength AND :maxLength")
   List<Interest> findSimilarLengthInterests(
       @Param("minLength") int minLength, @Param("maxLength") int maxLength);

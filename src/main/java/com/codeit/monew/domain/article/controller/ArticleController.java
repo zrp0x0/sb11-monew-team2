@@ -33,6 +33,7 @@ public class ArticleController {
 
   @Operation(summary = "출처 목록 조회", description = "서비스에서 지원하는 출처 목록을 조회합니다.")
   @GetMapping("/sources")
+  @ResponseStatus(HttpStatus.OK)
   public List<String> getSources() {
     log.info("뉴스 기사 출처 목록 조회 요청");
     return articleService.getSources();
@@ -50,6 +51,7 @@ public class ArticleController {
 
   @Operation(summary = "기사 뷰 등록", description = "기사 뷰를 등록합니다.")
   @PostMapping("/{articleId}/article-views")
+  @ResponseStatus(HttpStatus.OK)
   public ArticleViewDto registerArticleView(
       @PathVariable UUID articleId,
       @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId
@@ -60,6 +62,7 @@ public class ArticleController {
 
   @Operation(summary = "뉴스 기사 단건 조회", description = "뉴스 기사 ID로 뉴스 기사 단건을 조회합니다.")
   @GetMapping("/{articleId}")
+  @ResponseStatus(HttpStatus.OK)
   public ArticleDto getArticle(
       @PathVariable UUID articleId,
       @RequestHeader(value = "Monew-Request-User-ID", required = false) String requestUserId

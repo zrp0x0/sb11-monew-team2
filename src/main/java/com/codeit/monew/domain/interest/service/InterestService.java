@@ -16,6 +16,7 @@ import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,6 +35,9 @@ public class InterestService {
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
   private final ArticleInterestRepository articleInterestRepository;
+
+  private static final DateTimeFormatter CURSOR_DATE_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
 
   @Transactional
   public InterestResponse createInterest(InterestRegisterRequest request) {
@@ -116,10 +120,11 @@ public class InterestService {
     Interest lastInterest = interestList.get(interestList.size() - 1);
 
     String nextCursor = request.getOrderBy().equals("subscriberCount")
-        ? lastInterest.getSubscriberCount() + "_" + lastInterest.getId()
+        ? lastInterest.getSubscriberCount() + "_" +lastInterest.getId()
         : lastInterest.getName();
 
-    String nextAfter = hasNext ? String.valueOf(lastInterest.getCreatedAt()) : null;
+    String nextAfter = hasNext ? lastInterest.getCreatedAt().format(CURSOR_DATE_FORMATTER) : null;
+
     log.debug("interest search 완료 - 응답 사이즈: {}, hasNext: {}", content.size(), hasNext);
 
     return new CursorPageResponse<InterestResponse>(

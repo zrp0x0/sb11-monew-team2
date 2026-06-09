@@ -1,5 +1,5 @@
 package com.codeit.monew.domain.comment.dto;
 
 public enum CommentOrderBy {
-  createdAt, likeCount
+  CREATED_AT, LIKE_COUNT
 }
