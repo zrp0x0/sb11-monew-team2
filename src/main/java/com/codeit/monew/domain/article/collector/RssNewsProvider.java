@@ -1,7 +1,7 @@
 package com.codeit.monew.domain.article.collector;
 
+import com.codeit.monew.domain.article.collector.HankyungRssParser.RssItem;
 import com.codeit.monew.domain.article.entity.ArticleSource;
-import java.io.StringReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.LocalDateTime;
@@ -11,27 +11,19 @@ import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import javax.xml.parsers.DocumentBuilderFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringEscapeUtils;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RssNewsProvider implements NewsProvider {
 
-    private final RestTemplateBuilder restTemplateBuilder;
-    private final HankyungRssProperties hankyungRssProperties;
+    private final HankyungRssClient hankyungRssClient;
+    private final HankyungRssParser hankyungRssParser;
 
     @Override
     public ArticleSource source() {
@@ -40,74 +32,13 @@ public class RssNewsProvider implements NewsProvider {
 
     @Override
     public List<CollectedArticle> collect() {
-        String rssXml = fetchRssXml();
-        List<RssItem> rssItems = parseRssItems(rssXml);
+        String rssXml = hankyungRssClient.fetchRssXml();
+        List<RssItem> rssItems = hankyungRssParser.parse(rssXml);
 
         return rssItems.stream()
                 .map(this::toCollectedArticle)
                 .flatMap(Optional::stream)
                 .toList();
-    }
-
-    private String fetchRssXml() {
-        String rssUrl = hankyungRssProperties.getRssUrl();
-
-        if (!StringUtils.hasText(rssUrl)) {
-            throw new IllegalStateException("한국경제 RSS URL 설정이 필요합니다.");
-        }
-
-        try {
-            RestTemplate restTemplate = restTemplateBuilder.build();
-            String rssXml = restTemplate.getForObject(rssUrl, String.class);
-
-            if (!StringUtils.hasText(rssXml)) {
-                throw new IllegalStateException("한국경제 RSS 응답이 비어 있습니다.");
-            }
-
-            return rssXml;
-        } catch (RestClientException e) {
-            throw new IllegalStateException("한국경제 RSS 호출에 실패했습니다.", e);
-        }
-    }
-
-    private List<RssItem> parseRssItems(String rssXml) {
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-
-            Document document = factory.newDocumentBuilder()
-                    .parse(new InputSource(new StringReader(rssXml)));
-
-            NodeList itemNodes = document.getElementsByTagName("item");
-
-            return java.util.stream.IntStream.range(0, itemNodes.getLength())
-                    .mapToObj(itemNodes::item)
-                    .filter(node -> node instanceof Element)
-                    .map(node -> (Element) node)
-                    .map(itemElement -> new RssItem(
-                            getTextContent(itemElement, "title"),
-                            getTextContent(itemElement, "link"),
-                            getTextContent(itemElement, "description"),
-                            getTextContent(itemElement, "pubDate")
-                    ))
-                    .toList();
-        } catch (Exception e) {
-            throw new IllegalArgumentException("한국경제 RSS 파싱에 실패했습니다.", e);
-        }
-    }
-
-    private String getTextContent(Element element, String tagName) {
-        NodeList nodeList = element.getElementsByTagName(tagName);
-
-        if (nodeList.getLength() == 0) {
-            return null;
-        }
-
-        return nodeList.item(0).getTextContent();
     }
 
     private Optional<CollectedArticle> toCollectedArticle(RssItem item) {
@@ -272,13 +203,5 @@ public class RssNewsProvider implements NewsProvider {
         }
 
         return value.substring(0, maxLength);
-    }
-
-    private record RssItem(
-            String title,
-            String link,
-            String description,
-            String pubDate
-    ) {
     }
 }
