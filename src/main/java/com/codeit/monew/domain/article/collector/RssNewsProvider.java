@@ -47,10 +47,20 @@ public class RssNewsProvider implements NewsProvider {
         String summary = cleanText(item.description());
         Optional<LocalDateTime> publishedAt = parsePubDate(item.pubDate());
 
+        if (!StringUtils.hasText(summary)) {
+            summary = title;
+        }
+
         if (!StringUtils.hasText(title)
                 || !StringUtils.hasText(sourceUrl)
                 || !StringUtils.hasText(summary)
                 || publishedAt.isEmpty()) {
+            log.warn("한국경제 RSS item 제외. title={}, sourceUrl={}, summaryExists={}, pubDate={}, parsedPublishedAt={}",
+                    title,
+                    sourceUrl,
+                    StringUtils.hasText(summary),
+                    item.pubDate(),
+                    publishedAt.orElse(null));
             return Optional.empty();
         }
 

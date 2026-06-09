@@ -27,7 +27,7 @@ class RssNewsProviderTest {
     private RssNewsProvider rssNewsProvider;
 
     @Test
-    @DisplayName("한국경제 RSS item을 CollectedArticle로 변환한다")
+    @DisplayName("한국경제 RSS item을 CollectedArticle로 변환")
     void collect_returnCollectedArticlesFromRssItem() {
         // given
         String rssXml = "<rss></rss>";
@@ -58,7 +58,7 @@ class RssNewsProviderTest {
     }
 
     @Test
-    @DisplayName("필수 필드가 누락된 RSS item은 수집 결과에서 제외한다")
+    @DisplayName("필수 필드가 누락된 RSS item은 수집 결과에서 제외")
     void collect_skipInvalidRssItem() {
         // given
         String rssXml = "<rss></rss>";
@@ -66,10 +66,10 @@ class RssNewsProviderTest {
         when(hankyungRssClient.fetchRssXml()).thenReturn(rssXml);
         when(hankyungRssParser.parse(rssXml)).thenReturn(List.of(
                 new RssItem(
-                        "요약 없는 기사",
-                        "https://www.hankyung.com/article/2026052974211",
+                        "링크 없는 기사",
                         null,
-                        "Fri, 29 May 2026 10:00:00 +0900"
+                        "링크 없는 기사 요약",
+                        "Tue, 09 Jun 2026 16:01:30 +0900"
                 )
         ));
 
@@ -81,7 +81,7 @@ class RssNewsProviderTest {
     }
 
     @Test
-    @DisplayName("HTML 태그와 escape 문자를 정리하고 URL 추적 파라미터를 제거한다")
+    @DisplayName("HTML 태그와 escape 문자를 정리하고 URL 추적 파라미터 제거")
     void collect_cleanHtmlAndNormalizeUrl() {
         // given
         String rssXml = "<rss></rss>";
@@ -140,7 +140,7 @@ class RssNewsProviderTest {
     }
 
     @Test
-    @DisplayName("잘못된 pubDate를 가진 RSS item은 수집 결과에서 제외한다")
+    @DisplayName("잘못된 pubDate를 가진 RSS item은 수집 결과에서 제외")
     void collect_skipInvalidPubDateItem() {
         // given
         String rssXml = "<rss></rss>";
@@ -160,5 +160,30 @@ class RssNewsProviderTest {
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("description이 없는 RSS item은 title을 summary로 사용")
+    void collect_useTitleAsSummaryWhenDescriptionIsMissing() {
+        // given
+        String rssXml = "<rss></rss>";
+
+        when(hankyungRssClient.fetchRssXml()).thenReturn(rssXml);
+        when(hankyungRssParser.parse(rssXml)).thenReturn(List.of(
+                new RssItem(
+                        "요약 없는 한국경제 기사",
+                        "https://www.hankyung.com/article/202606095959i",
+                        null,
+                        "Tue, 09 Jun 2026 16:01:34 +0900"
+                )
+        ));
+
+        // when
+        List<CollectedArticle> result = rssNewsProvider.collect();
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).title()).isEqualTo("요약 없는 한국경제 기사");
+        assertThat(result.get(0).summary()).isEqualTo("요약 없는 한국경제 기사");
     }
 }
