@@ -12,6 +12,8 @@ import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
 import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.config.QueryDslTestConfig;
+import com.codeit.monew.global.monitoring.service.JobRunHistoryService;
+import com.codeit.monew.global.monitoring.service.MonewMetrics;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +26,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @DataJpaTest
@@ -46,6 +49,12 @@ public class CommentHardDeleteBatchTest {
 
   @Autowired
   private UserRepository userRepository;
+
+  @MockitoBean
+  private JobRunHistoryService jobRunHistoryService;
+
+  @MockitoBean
+  private MonewMetrics monewMetrics;
 
   private Article article;
   private User user;
