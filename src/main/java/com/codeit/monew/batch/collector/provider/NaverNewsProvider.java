@@ -2,13 +2,14 @@ package com.codeit.monew.batch.collector.provider;
 
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.interest.entity.Interest;
+import com.codeit.monew.global.monitoring.service.MonewMetrics;
 import com.codeit.monew.infra.externalapi.naver.client.NaverNewsClient;
 import com.codeit.monew.infra.externalapi.naver.dto.NaverNewsResponse;
 import feign.FeignException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -24,6 +25,7 @@ import org.springframework.web.util.HtmlUtils;
 public class NaverNewsProvider implements NewsProvider {
 
     private final NaverNewsClient naverNewsClient;
+    private final MonewMetrics monewMetrics;
     private static final DateTimeFormatter NAVER_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
 
     @Value("${external-api.naver.client-id}")
@@ -33,10 +35,10 @@ public class NaverNewsProvider implements NewsProvider {
     private String naverClientSecret;
 
     @Override
-    public List<CollectedNewsDto> fetchNews(Interest interest) {
+    public NewsFetchResult fetchNews(Interest interest) {
         List<String> keywords = interest.getKeywords();
         if (keywords == null || keywords.isEmpty()) {
-            return Collections.emptyList();
+            return NewsFetchResult.skipped(getSource(), "No keywords");
         }
 
         String combinedQuery = keywords.stream()
@@ -44,22 +46,25 @@ public class NaverNewsProvider implements NewsProvider {
             .collect(Collectors.joining(" OR "));
 
         if (combinedQuery.isBlank()) {
-            return Collections.emptyList();
+            return NewsFetchResult.skipped(getSource(), "No valid keywords");
         }
 
+        long startedAt = System.nanoTime();
+        monewMetrics.incrementNaverCalls();
         try {
             NaverNewsResponse response = naverNewsClient.searchNews(
                 naverClientId, naverClientSecret, combinedQuery, 10, 1, "date");
 
-            if (response == null || response.items() == null) {
+            if (response == null || response.items() == null || response.items().isEmpty()) {
                 log.warn("[news-collector] 네이버 뉴스 응답이 비어 있습니다. interestId={}", interest.getId());
-                return Collections.emptyList();
+                monewMetrics.incrementNaverEmptyResponses();
+                return NewsFetchResult.empty(getSource(), "Empty response");
             }
 
             log.info("[news-collector] 네이버 뉴스 후보를 수집했습니다. interestId={}, keywordCount={}, itemCount={}",
                 interest.getId(), keywords.size(), response.items().size());
 
-            return response.items().stream()
+            List<CollectedNewsDto> collectedNews = response.items().stream()
                 .filter(item -> (item.originallink() != null && !item.originallink().isBlank())
                     || (item.link() != null && !item.link().isBlank()))
                 .map(item -> {
@@ -77,6 +82,13 @@ public class NaverNewsProvider implements NewsProvider {
                     );
                 })
                 .toList();
+
+            if (collectedNews.isEmpty()) {
+                monewMetrics.incrementNaverEmptyResponses();
+                return NewsFetchResult.empty(getSource(), "No valid article URLs");
+            }
+
+            return NewsFetchResult.success(getSource(), collectedNews);
         } catch (FeignException e) {
             log.error(
                 "[news-collector] 네이버 뉴스 API 호출에 실패했습니다. interestId={}, status={}, body={}",
@@ -85,11 +97,15 @@ public class NaverNewsProvider implements NewsProvider {
                 truncate(e.contentUTF8()),
                 e
             );
-            return Collections.emptyList();
+            monewMetrics.incrementNaverErrors();
+            return NewsFetchResult.failed(getSource(), "Naver API failure: status=" + e.status());
         } catch (Exception e) {
             log.error("[news-collector] 네이버 뉴스 수집 중 예외가 발생했습니다. interestId={}, errorMessage={}",
-                interest.getId(), e.getMessage());
-            return Collections.emptyList();
+                interest.getId(), e.getMessage(), e);
+            monewMetrics.incrementNaverErrors();
+            return NewsFetchResult.failed(getSource(), e.getMessage());
+        } finally {
+            monewMetrics.recordNaverDuration(Duration.ofNanos(System.nanoTime() - startedAt));
         }
     }
 
