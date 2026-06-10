@@ -7,6 +7,8 @@ import com.codeit.monew.domain.article.dto.response.ArticleDto;
 import com.codeit.monew.domain.article.service.ArticleService;
 import com.codeit.monew.domain.articleView.dto.response.ArticleViewDto;
 import com.codeit.monew.global.dto.CursorPageResponse;
+import com.codeit.monew.domain.article.entity.ArticleSource;
+import org.springframework.web.bind.annotation.RequestParam;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ArticleController {
 
   private final ArticleService articleService;
+  private final ArticleSearchRequestNormalizer articleSearchRequestNormalizer;
 
   @Operation(summary = "출처 목록 조회", description = "서비스에서 지원하는 출처 목록을 조회합니다.")
   @GetMapping("/sources")
@@ -43,10 +46,16 @@ public class ArticleController {
   @GetMapping
   @ResponseStatus(HttpStatus.OK)
   public CursorPageResponse<ArticleDto> searchArticles(
-      @Valid @ModelAttribute ArticleSearchRequest request,
-      @RequestHeader(HEADER_USER_ID) UUID requestUserId
+          @Valid @ModelAttribute ArticleSearchRequest request,
+          @RequestParam(value = "sourceIn[]", required = false) List<ArticleSource> sourceInBrackets,
+          @RequestHeader(HEADER_USER_ID) UUID requestUserId
   ) {
-    return articleService.searchArticles(request, requestUserId);
+    ArticleSearchRequest normalizedRequest = articleSearchRequestNormalizer.normalize(
+            request,
+            sourceInBrackets
+    );
+
+    return articleService.searchArticles(normalizedRequest, requestUserId);
   }
 
   @Operation(summary = "기사 뷰 등록", description = "기사 뷰를 등록합니다.")

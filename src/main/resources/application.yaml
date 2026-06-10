@@ -1,25 +1,45 @@
-server:
-  port: ${PORT:8080}
-
 spring:
-  application:
-    name: P1_Monew
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health
-  endpoint:
-    health:
-      show-details: never
-
-scheduling:
-  enabled: true
-  zone: Asia/Seoul
-  pool-size: 4
-  thread-name-prefix: monew-scheduler-
+  flyway:
+    enabled: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/monew_db
+    username: user
+    password: pass
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+  batch:
+    job:
+      enabled: false # 서버가 켜질 때 배치가 자동으로 실행되는 것을 방지
 
 logging:
   level:
-    root: info
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+    com.codeit.monew: trace
+
+external-api:
+  naver:
+    url: https://openapi.naver.com
+    client-id: ${NAVER_CLIENT_ID:your_client_id}
+    client-secret: ${NAVER_CLIENT_SECRET:your_client_secret}
+  hankyung:
+    rss-url: ${HANKYUNG_RSS_URL:https://www.hankyung.com/feed/all-news}
+
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID:}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    region:
+      static: ap-northeast-2
+
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET_NAME:dummy-bucket}
