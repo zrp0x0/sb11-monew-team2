@@ -53,6 +53,8 @@ CREATE TABLE article_interests (
         FOREIGN KEY (interest_id) REFERENCES interests (id)
 );
 
+CREATE INDEX idx_article_interests_interest_id ON article_interests (interest_id);
+
 CREATE TABLE comments (
     id UUID PRIMARY KEY,
     article_id UUID NOT NULL,
@@ -95,6 +97,8 @@ CREATE TABLE subscriptions (
     CONSTRAINT fk_subscriptions_user
         FOREIGN KEY (user_id) REFERENCES users (id)
 );
+
+CREATE INDEX idx_subscriptions_user_id ON subscriptions (user_id);
 
 CREATE TABLE article_views (
     id UUID PRIMARY KEY,
