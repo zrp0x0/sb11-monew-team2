@@ -22,7 +22,7 @@ public interface ArticleInterestRepository extends JpaRepository<ArticleInterest
   @Modifying(clearAutomatically = true)
   @Query(value = """
       INSERT INTO article_interests (id, article_id, interest_id)
-      VALUES (:id, :articleId, :interestId) 
+      VALUES (:id, :articleId, :interestId)
       ON CONFLICT (article_id, interest_id) DO NOTHING
       """, nativeQuery = true)
   void insertIgnoreMapping(@Param("id") UUID id, @Param("articleId") UUID articleId, @Param("interestId") UUID interestId);
