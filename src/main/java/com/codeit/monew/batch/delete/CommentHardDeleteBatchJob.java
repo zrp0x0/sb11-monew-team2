@@ -1,4 +1,4 @@
-package com.codeit.monew.global.batch;
+package com.codeit.monew.batch.delete;
 
 import com.codeit.monew.domain.comment.repository.CommentRepository;
 import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
