@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -217,7 +218,7 @@ public class InterestServiceTest {
     given(interestRepository.findAllByCondition(request))
         .willReturn(interestList);
 
-    List<UUID> subscribedInterestIds = List.of(interestA.getId(), interestC.getId());
+    Set<UUID> subscribedInterestIds = Set.of(interestA.getId(), interestC.getId());
     given(subscriptionRepository.findSubscribedInterestIds(eq(userId), any()))
         .willReturn(subscribedInterestIds);
 

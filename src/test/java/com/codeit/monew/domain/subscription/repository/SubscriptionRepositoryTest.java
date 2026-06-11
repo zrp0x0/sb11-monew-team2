@@ -10,6 +10,7 @@ import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.config.JpaAuditingConfig;
 import com.codeit.monew.global.config.QuerydslConfig;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,8 +64,7 @@ public class SubscriptionRepositoryTest {
     List<UUID> interestIds = List.of(interestA.getId(), interestB.getId());
 
     //when
-    List<UUID> result = subscriptionRepository.findSubscribedInterestIds(user.getId(), interestIds);
-
+    Set<UUID> result = subscriptionRepository.findSubscribedInterestIds(user.getId(), interestIds);
     //then
     assertThat(result).hasSize(2)
         .containsExactlyInAnyOrder(interestA.getId(), interestB.getId())
@@ -87,7 +87,7 @@ public class SubscriptionRepositoryTest {
     List<UUID> interestIds = List.of(interestA.getId());
 
     //when
-    List<UUID> result = subscriptionRepository.findSubscribedInterestIds(user.getId(), interestIds);
+    Set<UUID> result = subscriptionRepository.findSubscribedInterestIds(user.getId(), interestIds);
 
     //then
     assertThat(result).isEmpty();

@@ -19,6 +19,7 @@ import java.text.Normalizer.Form;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -109,7 +110,7 @@ public class InterestService {
         .map(Interest::getId)
         .toList();
 
-    List<UUID> subscribedInterestIds = subscriptionRepository.findSubscribedInterestIds(userId,
+    Set<UUID> subscribedInterestIds = subscriptionRepository.findSubscribedInterestIds(userId,
         interestIds);
 
     List<InterestDto> content = interestList.stream()

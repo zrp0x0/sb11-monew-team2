@@ -3,6 +3,7 @@ package com.codeit.monew.domain.subscription.repository;
 import com.codeit.monew.domain.subscription.entity.Subscription;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -19,7 +20,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
 
   @Query("SELECT s.interest.id FROM Subscription s " +
       "WHERE s.user.id = :userId AND s.interest.id IN :interestIds")
-  List<UUID> findSubscribedInterestIds(
+  Set<UUID> findSubscribedInterestIds(
       @Param("userId") UUID userId, @Param("interestIds") List<UUID> interestIds);
 
   @Modifying(clearAutomatically = true)
