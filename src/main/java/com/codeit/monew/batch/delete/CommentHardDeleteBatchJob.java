@@ -1,5 +1,6 @@
 package com.codeit.monew.batch.delete;
 
+import com.codeit.monew.batch.delete.service.CommentHardDeleteChunkService;
 import com.codeit.monew.domain.comment.repository.CommentRepository;
 import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
 import java.time.LocalDateTime;
@@ -18,12 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommentHardDeleteBatchJob {
 
   private final CommentRepository commentRepository;
-  private final CommentLikeRepository commentLikeRepository;
+  private final CommentHardDeleteChunkService chunkService;
 
   @Value("${batch.comment.hard-delete.batch-size:1000}")
   private int batchsize;
 
-  @Transactional
   @Scheduled(cron = "0 0 2 * * *", zone = "${scheduling.zone:Asia/Seoul}") // 매일 새벽 2시
   public void execute() {
     LocalDateTime threshold = LocalDateTime.now().minusDays(7);
@@ -33,8 +33,7 @@ public class CommentHardDeleteBatchJob {
     do {
       ids = commentRepository.findIdsByDeletedAtBefore(threshold, batchsize);
       if(!ids.isEmpty()) {
-        commentLikeRepository.hardDeleteAllByCommentIdIn(ids);
-        commentRepository.hardDeleteAllByIdIn(ids);
+        chunkService.deleteChunk(ids);
         totalDeleted += ids.size();
       }
     } while (ids.size() == batchsize);

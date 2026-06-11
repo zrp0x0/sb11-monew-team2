@@ -3,6 +3,7 @@ package com.codeit.monew.global.batch;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.codeit.monew.batch.delete.CommentHardDeleteBatchJob;
+import com.codeit.monew.batch.delete.service.CommentHardDeleteChunkService;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
@@ -28,7 +29,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @DataJpaTest
-@Import({QueryDslTestConfig.class, CommentHardDeleteBatchJob.class})
+@Import({QueryDslTestConfig.class, CommentHardDeleteBatchJob.class, CommentHardDeleteChunkService.class})
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = Replace.NONE)
 public class CommentHardDeleteBatchTest {
