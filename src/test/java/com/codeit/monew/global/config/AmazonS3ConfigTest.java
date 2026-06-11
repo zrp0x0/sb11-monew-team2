@@ -37,7 +37,7 @@ class AmazonS3ConfigTest {
 
     assertThatThrownBy(config::amazonS3Client)
         .isInstanceOf(IllegalStateException.class)
-        .hasMessage("AWS access key and secret key must be configured together.");
+        .hasMessage("AWS 액세스 키와 비밀 키는 함께 설정해야 합니다.");
   }
 
   private AmazonS3Config config(String accessKey, String secretKey) {
