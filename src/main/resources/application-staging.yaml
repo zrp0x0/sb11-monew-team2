@@ -17,6 +17,9 @@ spring:
     job:
       enabled: false
 
+batch:
+  chunk-size: 500
+
 external-api:
   naver:
     url: ${NAVER_API_URL:https://openapi.naver.com}
