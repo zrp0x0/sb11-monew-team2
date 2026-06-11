@@ -15,7 +15,7 @@ import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestUpdateRequest;
-import com.codeit.monew.domain.interest.dto.response.InterestResponse;
+import com.codeit.monew.domain.interest.dto.response.InterestDto;
 import com.codeit.monew.domain.interest.entity.Interest;
 import com.codeit.monew.domain.interest.exception.InterestErrorCode;
 import com.codeit.monew.domain.interest.exception.InterestException;
@@ -79,7 +79,7 @@ public class InterestServiceTest {
         .willReturn(interest);
 
     //when
-    InterestResponse result = interestService.createInterest(request);
+    InterestDto result = interestService.createInterest(request);
 
     //then
     assertThat(result).isNotNull();
@@ -175,7 +175,7 @@ public class InterestServiceTest {
         .willReturn(Optional.of(interest));
 
     //when
-    InterestResponse result = interestService.updateInterest(interestId, request);
+    InterestDto result = interestService.updateInterest(interestId, request);
 
     //then
     assertThat(result.id()).isEqualTo(interestId);
@@ -222,7 +222,7 @@ public class InterestServiceTest {
         .willReturn(subscribedInterestIds);
 
     //when
-    CursorPageResponse<InterestResponse> result = interestService.searchInterest(userId, request);
+    CursorPageResponse<InterestDto> result = interestService.searchInterest(userId, request);
 
     //then
     assertThat(result.content()).hasSize(2);
