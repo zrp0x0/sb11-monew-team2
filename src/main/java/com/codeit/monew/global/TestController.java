@@ -2,7 +2,7 @@ package com.codeit.monew.global;
 
 import com.codeit.monew.batch.backup.scheduler.ArticleBackupScheduler;
 import com.codeit.monew.batch.collector.service.NewsCollectorService;
-import com.codeit.monew.global.batch.CommentHardDeleteBatchJob;
+import com.codeit.monew.batch.delete.CommentHardDeleteBatchJob;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
