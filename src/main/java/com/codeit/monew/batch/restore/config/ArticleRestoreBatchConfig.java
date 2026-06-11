@@ -74,19 +74,28 @@ public class ArticleRestoreBatchConfig {
           String s3Key = "article/" + targetDate + ".json";
           String tempPath = getTempFilePath(targetDate);
 
-          // TODO: S3에 해당 날짜의 백업 파일이 있는지 먼저 체크 후, 없으면 스킵(정상 종료)하도록 구현
+          // S3에 해당 날짜의 백업 파일이 없는 경우
           if (!amazonS3.doesObjectExist(bucketName, s3Key)) {
-            log.warn("[{}] S3에 해당 날짜 백업 파일이 존재하지 않아 다운로드를 건너뜁니다. (s3Key: {})", targetDate, s3Key);
+            log.warn("[{}] S3 백업 파일 미존재 (대상 Key: {}) - 다운로드를 스킵합니다.", targetDate, s3Key);
+
+            // JsonItemReader의 NPE 방지를 위한 빈 JSON 배열([]) 파일 생성
+            Files.writeString(new File(tempPath).toPath(), "[]");
+
+            chunkContext.getStepContext().getStepExecution().getJobExecution().getExecutionContext()
+                .put(TEMP_FILE_PATH_KEY, tempPath);
+
             return RepeatStatus.FINISHED;
           }
 
-          log.info("S3 다운로드 시작: s3://{}/{} -> 로컬 경로: {}", bucketName, s3Key, tempPath);
+          log.info("[{}] S3 백업 파일 다운로드 시작 (Key: {} -> Path: {})", targetDate, s3Key, tempPath);
 
           S3Object s3Object = amazonS3.getObject(bucketName, s3Key);
-
           File localTempFile = new File(tempPath);
-          Files.copy(s3Object.getObjectContent(), localTempFile.toPath(),
-              StandardCopyOption.REPLACE_EXISTING);
+
+          try (var inputStream = s3Object.getObjectContent()) {
+            Files.copy(inputStream, localTempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+          }
+          log.info("[{}] S3 백업 파일 로컬 저장 완료", targetDate);
 
           chunkContext.getStepContext().getStepExecution().getJobExecution()
               .getExecutionContext().put(TEMP_FILE_PATH_KEY, tempPath);
@@ -108,13 +117,13 @@ public class ArticleRestoreBatchConfig {
           public @Nullable ExitStatus afterStep(StepExecution stepExecution) {
             String tempPath = stepExecution.getJobExecution().getExecutionContext()
                 .getString(TEMP_FILE_PATH_KEY);
+            String targetDate = stepExecution.getJobParameters().getString("targetDate");
 
             if (tempPath != null) {
               File localTempFile = new File(tempPath);
               if (localTempFile.exists()) {
                 boolean deleted = localTempFile.delete();
-                log.info("로컬 임시 파일 삭제 {}: {}", deleted ? "성공" : "실패", tempPath);
-              }
+                log.info("[{}] 로컬 임시 파일 삭제 {}: {}", targetDate, deleted ? "성공" : "실패", tempPath);              }
             }
 
             return StepExecutionListener.super.afterStep(stepExecution);
@@ -141,8 +150,7 @@ public class ArticleRestoreBatchConfig {
         .jsonObjectReader(jsonObjectReader)
         .resource(new FileSystemResource(tempPath))
         .name("articleJsonReader")
-        // TODO: 파일이 없어도 에러 내지 말고 조용히 넘어가도록 구현
-        .strict(false)
+        .strict(false) // 파일 내용이 비어있더라도 예외를 발생시키지 않고 스킵하도록 설정
         .build();
   }
 
