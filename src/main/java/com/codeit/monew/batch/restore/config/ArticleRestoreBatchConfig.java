@@ -4,6 +4,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.S3Object;
 import com.codeit.monew.batch.backup.dto.ArticleBackupDto;
 import com.codeit.monew.domain.article.entity.Article;
+import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -13,6 +14,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -43,9 +45,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 public class ArticleRestoreBatchConfig {
 
   private final ArticleRepository articleRepository;
+  private final ArticleInterestRepository articleInterestRepository;
   private final AmazonS3 amazonS3;
 
-  @Value("${batch.chunk-size:1000}")
+  @Value("${batch.chunk-size:500}")
   private int chunkSize;
 
   @Value("${aws.s3.bucket}")
@@ -96,7 +99,7 @@ public class ArticleRestoreBatchConfig {
   @Bean
   public Step restoreToDbStep(JobRepository jobRepository, PlatformTransactionManager ptm) {
     return new StepBuilder("restoreToDbStep", jobRepository)
-        .<ArticleBackupDto, Article>chunk(chunkSize, ptm)
+        .<ArticleBackupDto, ArticleBackupDto>chunk(chunkSize, ptm)
         .reader(articleJsonReader(null))
         .processor(articleRestoreProcessor())
         .writer(articleDbWriter(null))
@@ -130,7 +133,8 @@ public class ArticleRestoreBatchConfig {
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.registerModule(new JavaTimeModule());
 
-    JacksonJsonObjectReader<ArticleBackupDto> jsonObjectReader = new JacksonJsonObjectReader<>(ArticleBackupDto.class);
+    JacksonJsonObjectReader<ArticleBackupDto> jsonObjectReader = new JacksonJsonObjectReader<>(
+        ArticleBackupDto.class);
     jsonObjectReader.setMapper(objectMapper);
 
     return new JsonItemReaderBuilder<ArticleBackupDto>()
@@ -143,37 +147,63 @@ public class ArticleRestoreBatchConfig {
   }
 
   @Bean
-  public ItemProcessor<ArticleBackupDto, Article> articleRestoreProcessor() {
-    return dto -> Article.restore(
-        dto.id(),
-        dto.source(),
-        dto.sourceUrl(),
-        dto.title(),
-        dto.summary(),
-        dto.publishDate()
-    );
+  public ItemProcessor<ArticleBackupDto, ArticleBackupDto> articleRestoreProcessor() {
+    return dto -> dto;
   }
 
   @Bean
   @StepScope
-  public ItemWriter<Article> articleDbWriter(
+  public ItemWriter<ArticleBackupDto> articleDbWriter(
       @Value("#{stepExecution}") StepExecution stepExecution
   ) {
-    return articles -> {
+    return dtos -> {
       var jobContext = stepExecution.getJobExecution().getExecutionContext();
 
       List<String> restoredIds = Optional.ofNullable(
               (List<String>) jobContext.get("RESTORED_ARTICLE_IDS"))
           .orElse(new ArrayList<>());
 
-      for (Article article : articles) {
+      // 통계(로그) 용 변수 세팅
+      int chunkTotalDtoCount = dtos.size(); // S3에서 읽어온 DTO 개수
+      int chunkInsertedArticleCount = 0;    // 실제 DB에 복구된 기사 개수 (중복 제외)
+      int chunkInsertedMappingCount = 0;    // 실제 DB에 복구된 관심사 매핑 개수
+      int chunkSkippedArticleCount = 0;     // 이미 DB에 있어서 무시된 기사 개수
+
+      for (ArticleBackupDto dto : dtos) {
+        // 기사 엔티티 생성
+        Article article = Article.restore(
+            dto.id(), dto.source(), dto.sourceUrl(), dto.title(), dto.summary(), dto.publishDate()
+        );
+
+        // 기사 본체 복구 (articles 테이블)
         int updatedRows = articleRepository.upsertArticleSkipDuplicate(article);
+
+        // 기사가 새롭게 INSERT 되었다면 매핑도 진행 (중복 Skip 된 경우는 매핑도 Skip)
         if (updatedRows > 0) {
           restoredIds.add(article.getId().toString());
+          chunkInsertedArticleCount++; // 기사 복구 성공 +1
+
+          // 관심사 매핑 복구 (article_interests 테이블)
+          if (dto.interestIds() != null && !dto.interestIds().isEmpty()) {
+            for (UUID interestId : dto.interestIds()) {
+              // 새로 발급한 랜덤 UUID를 식별자로 사용
+              articleInterestRepository.insertIgnoreMapping(UUID.randomUUID(), article.getId(),
+                  interestId);
+              chunkInsertedMappingCount++; // 매핑 복구 성공 +1
+            }
+          }
+        } else {
+          chunkSkippedArticleCount++; // 이미 존재하는 기사 스킵 +1
         }
       }
-
       jobContext.put("RESTORED_ARTICLE_IDS", restoredIds);
+
+      log.info("========== [기사 복구 청크 요약] ==========");
+      log.info("읽어온 데이터: 총 {} 건", chunkTotalDtoCount);
+      log.info("기사 복구 성공: {} 건 (articles 테이블)", chunkInsertedArticleCount);
+      log.info("매핑 복구 성공: {} 건 (article_interests 테이블)", chunkInsertedMappingCount);
+      log.info("중복 스킵(무시): {} 건", chunkSkippedArticleCount);
+      log.info("=========================================");
     };
   }
 
