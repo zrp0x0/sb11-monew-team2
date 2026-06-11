@@ -71,4 +71,58 @@ public class InterestRepositoryTest {
     assertThat(result).isEmpty();
     assertThat(result).isNotNull();
   }
+
+  @Test
+  @DisplayName("incrementSubscriberCount 쿼리를 실행하면 구독자 수가 1 증가하고 업데이트된 행 개수를 반환한다.")
+  void incrementSubscriberCount_Success() {
+    // given
+    Interest interest = Interest.create("테스트 관심사", List.of("테스트"));
+    interestRepository.save(interest);
+    tem.flush(); tem.clear();
+
+    // when
+    int updatedCount = interestRepository.incrementSubscriberCount(interest.getId());
+
+    // then
+    assertThat(updatedCount).isEqualTo(1); // 1개의 행이 업데이트됨
+    Interest foundInterest = interestRepository.findById(interest.getId()).orElseThrow();
+    assertThat(foundInterest.getSubscriberCount()).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("decrementSubscriberCount 쿼리를 실행하면 구독자 수가 1 감소한다.")
+  void decrementSubscriberCount_Success() {
+    // given
+    Interest interest = Interest.create("테스트 관심사", List.of("테스트"));
+    interestRepository.save(interest);
+
+    // 미리 1을 증가
+    interestRepository.incrementSubscriberCount(interest.getId());
+    tem.flush(); tem.clear();
+
+    // when
+    int updatedCount = interestRepository.decrementSubscriberCount(interest.getId());
+
+    // then
+    assertThat(updatedCount).isEqualTo(1);
+    Interest foundInterest = interestRepository.findById(interest.getId()).orElseThrow();
+    assertThat(foundInterest.getSubscriberCount()).isEqualTo(0L);
+  }
+
+  @Test
+  @DisplayName("구독자 수가 0일 때 decrementSubscriberCount 쿼리를 실행하면 음수로 떨어지지 않는다.")
+  void decrementSubscriberCount_Prevent_Negative() {
+    // given
+    Interest interest = Interest.create("테스트 관심사", List.of("테스트"));
+    interestRepository.save(interest);
+    tem.flush(); tem.clear();
+
+    // when
+    int updatedCount = interestRepository.decrementSubscriberCount(interest.getId());
+
+    // then
+    assertThat(updatedCount).isEqualTo(0);
+    Interest foundInterest = interestRepository.findById(interest.getId()).orElseThrow();
+    assertThat(foundInterest.getSubscriberCount()).isEqualTo(0L);
+  }
 }
