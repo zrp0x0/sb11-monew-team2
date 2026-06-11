@@ -28,6 +28,8 @@ external-api:
     url: https://openapi.naver.com
     client-id: ${NAVER_CLIENT_ID:your_client_id}
     client-secret: ${NAVER_CLIENT_SECRET:your_client_secret}
+  hankyung:
+    rss-url: ${HANKYUNG_RSS_URL:https://www.hankyung.com/feed/all-news}
 
 cloud:
   aws:

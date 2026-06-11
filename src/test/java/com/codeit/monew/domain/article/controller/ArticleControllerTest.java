@@ -33,7 +33,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
@@ -46,13 +45,17 @@ class ArticleControllerTest {
   @Mock
   private ArticleService articleService;
 
-  @InjectMocks
   private ArticleController articleController;
 
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
+    articleController = new ArticleController(
+            articleService,
+            new ArticleSearchRequestNormalizer()
+    );
+
     mockMvc = MockMvcBuilders.standaloneSetup(articleController)
         .setControllerAdvice(new GlobalExceptionHandler())
         .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper()))
@@ -254,7 +257,7 @@ class ArticleControllerTest {
   }
 
   @Test
-  @DisplayName("뉴스 기사 단건 조회에 성공한다")
+  @DisplayName("뉴스 기사 단건 조회 성공")
   void getArticle_success() throws Exception {
     // given
     UUID articleId = UUID.randomUUID();
@@ -295,5 +298,41 @@ class ArticleControllerTest {
     return new ObjectMapper()
         .registerModule(new JavaTimeModule())
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+  }
+
+  @Test
+  @DisplayName("뉴스 기사 목록 조회 시 sourceIn[] 배열 파라미터 처리")
+  void searchArticles_withSourceInBrackets_success() throws Exception {
+    // given
+    UUID requestUserId = UUID.randomUUID();
+
+    CursorPageResponse<ArticleDto> response = new CursorPageResponse<>(
+            List.of(),
+            null,
+            null,
+            10,
+            0L,
+            false
+    );
+
+    when(articleService.searchArticles(any(ArticleSearchRequest.class), eq(requestUserId)))
+            .thenReturn(response);
+
+    // when & then
+    mockMvc.perform(get("/api/articles")
+                    .param("sourceIn[]", "HANKYUNG")
+                    .param("orderBy", "publishDate")
+                    .param("direction", "DESC")
+                    .param("limit", "10")
+                    .header("Monew-Request-User-ID", requestUserId.toString()))
+            .andExpect(status().isOk());
+
+    ArgumentCaptor<ArticleSearchRequest> captor =
+            ArgumentCaptor.forClass(ArticleSearchRequest.class);
+
+    verify(articleService).searchArticles(captor.capture(), eq(requestUserId));
+
+    ArticleSearchRequest request = captor.getValue();
+    assertThat(request.sourceIn()).containsExactly(ArticleSource.HANKYUNG);
   }
 }
