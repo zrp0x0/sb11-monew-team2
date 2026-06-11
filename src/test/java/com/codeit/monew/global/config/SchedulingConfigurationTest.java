@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 import com.codeit.monew.P1MonewApplication;
 import com.codeit.monew.batch.backup.scheduler.ArticleBackupScheduler;
 import com.codeit.monew.batch.collector.service.NewsCollectorService;
-import com.codeit.monew.global.batch.CommentHardDeleteBatchJob;
+import com.codeit.monew.batch.delete.CommentHardDeleteBatchJob;
 import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Instant;
