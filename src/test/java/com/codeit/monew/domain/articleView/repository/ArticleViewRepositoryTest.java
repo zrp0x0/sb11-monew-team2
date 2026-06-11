@@ -9,6 +9,9 @@ import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.global.config.QueryDslTestConfig;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,5 +63,46 @@ class ArticleViewRepositoryTest {
         assertThat(result.get().getId()).isEqualTo(articleView.getId());
         assertThat(result.get().getUser().getId()).isEqualTo(user.getId());
         assertThat(result.get().getArticle().getId()).isEqualTo(article.getId());
+    }
+
+    @Test
+    @DisplayName("사용자가 조회한 기사 ID 목록만 조회함")
+    void findViewedArticleIds_success() {
+        // given
+        User user = entityManager.persistAndFlush(
+                User.create("viewer-list@example.com", "viewerList", "password-hash")
+        );
+
+        Article viewedArticle = entityManager.persistAndFlush(
+                Article.create(
+                        ArticleSource.NAVER,
+                        "https://news.example.com/viewed-article",
+                        "조회한 기사",
+                        "조회한 기사 요약",
+                        LocalDateTime.of(2026, 5, 29, 12, 0)
+                )
+        );
+
+        Article notViewedArticle = entityManager.persistAndFlush(
+                Article.create(
+                        ArticleSource.HANKYUNG,
+                        "https://news.example.com/not-viewed-article",
+                        "조회하지 않은 기사",
+                        "조회하지 않은 기사 요약",
+                        LocalDateTime.of(2026, 5, 29, 13, 0)
+                )
+        );
+
+        entityManager.persistAndFlush(ArticleView.create(user, viewedArticle));
+        entityManager.clear();
+
+        // when
+        Set<UUID> viewedArticleIds = articleViewRepository.findViewedArticleIds(
+                user.getId(),
+                List.of(viewedArticle.getId(), notViewedArticle.getId())
+        );
+
+        // then
+        assertThat(viewedArticleIds).containsExactly(viewedArticle.getId());
     }
 }
