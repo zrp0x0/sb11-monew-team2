@@ -2,7 +2,7 @@ package com.codeit.monew.batch.restore.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,8 +33,8 @@ public class ArticleRestoreControllerTest {
   @DisplayName("뉴스 복구 API 호출 시 성공 응답을 반환한다.")
   void restoreArticles_Success() throws Exception {
     //given
-    LocalDate from = LocalDate.of(2026, 1, 1);
-    LocalDate to = LocalDate.of(2026, 1, 5);
+    LocalDateTime from = LocalDateTime.of(2026, 1, 1, 0, 0, 0);
+    LocalDateTime to = LocalDateTime.of(2026, 1, 5, 23, 59, 59);
 
     ArticleRestoreResultResponse mockResponse = ArticleRestoreResultResponse.of(
         LocalDateTime.now(),
@@ -45,7 +45,7 @@ public class ArticleRestoreControllerTest {
         .thenReturn(List.of(mockResponse));
 
     //when & then
-    mockMvc.perform(post("/api/articles/restore")
+    mockMvc.perform(get("/api/articles/restore")
             .param("from", from.toString())
             .param("to", to.toString()))
         .andExpect(status().isOk())
