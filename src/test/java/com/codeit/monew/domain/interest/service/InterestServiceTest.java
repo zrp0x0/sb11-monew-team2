@@ -15,7 +15,7 @@ import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestUpdateRequest;
-import com.codeit.monew.domain.interest.dto.response.InterestResponse;
+import com.codeit.monew.domain.interest.dto.response.InterestDto;
 import com.codeit.monew.domain.interest.entity.Interest;
 import com.codeit.monew.domain.interest.exception.InterestErrorCode;
 import com.codeit.monew.domain.interest.exception.InterestException;
@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -79,7 +80,7 @@ public class InterestServiceTest {
         .willReturn(interest);
 
     //when
-    InterestResponse result = interestService.createInterest(request);
+    InterestDto result = interestService.createInterest(request);
 
     //then
     assertThat(result).isNotNull();
@@ -175,7 +176,7 @@ public class InterestServiceTest {
         .willReturn(Optional.of(interest));
 
     //when
-    InterestResponse result = interestService.updateInterest(interestId, request);
+    InterestDto result = interestService.updateInterest(interestId, request);
 
     //then
     assertThat(result.id()).isEqualTo(interestId);
@@ -217,12 +218,12 @@ public class InterestServiceTest {
     given(interestRepository.findAllByCondition(request))
         .willReturn(interestList);
 
-    List<UUID> subscribedInterestIds = List.of(interestA.getId(), interestC.getId());
+    Set<UUID> subscribedInterestIds = Set.of(interestA.getId(), interestC.getId());
     given(subscriptionRepository.findSubscribedInterestIds(eq(userId), any()))
         .willReturn(subscribedInterestIds);
 
     //when
-    CursorPageResponse<InterestResponse> result = interestService.searchInterest(userId, request);
+    CursorPageResponse<InterestDto> result = interestService.searchInterest(userId, request);
 
     //then
     assertThat(result.content()).hasSize(2);

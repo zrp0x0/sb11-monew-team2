@@ -99,7 +99,6 @@ class SubscriptionServiceTest {
         userRepository.save(newUser);
 
         // when & then
-        // TODO: InterestException으로 변경
         em.flush();
         em.clear();
         assertThatThrownBy(

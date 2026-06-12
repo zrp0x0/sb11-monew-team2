@@ -4,7 +4,7 @@ import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
 import com.codeit.monew.domain.interest.dto.request.InterestUpdateRequest;
-import com.codeit.monew.domain.interest.dto.response.InterestResponse;
+import com.codeit.monew.domain.interest.dto.response.InterestDto;
 import com.codeit.monew.domain.interest.entity.Interest;
 import com.codeit.monew.domain.interest.exception.InterestErrorCode;
 import com.codeit.monew.domain.interest.exception.InterestException;
@@ -19,6 +19,7 @@ import java.text.Normalizer.Form;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,10 +39,11 @@ public class InterestService {
 
   private static final DateTimeFormatter CURSOR_DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+  private static final LevenshteinDistance LEVENSHTEIN_DISTANCE = LevenshteinDistance.getDefaultInstance();
 
   @Transactional
-  public InterestResponse createInterest(InterestRegisterRequest request) {
-    log.debug("interest register 시작 - 입력값: {}", request);
+  public InterestDto createInterest(InterestRegisterRequest request) {
+    log.debug("관심사 등록 시작 - 입력값: {}", request);
     String name = request.name();
 
     if (interestRepository.existsByName(name)) {
@@ -52,27 +54,28 @@ public class InterestService {
 
     Interest interest = Interest.create(name, request.keywords());
     interest = interestRepository.save(interest);
-    log.info("interest register 완료");
+    log.info("관심사 등록 완료 - interestId: {}, name: {}", interest.getId(), name);
 
-    return InterestResponse.from(interest);
+    return InterestDto.from(interest);
   }
 
   @Transactional
-  public InterestResponse updateInterest(UUID interestId, InterestUpdateRequest request) {
-    log.debug("interest update 시작 - 입력값: {}, {}", interestId, request);
+  public InterestDto updateInterest(UUID interestId, InterestUpdateRequest request) {
+    log.debug("관심사 수정 시작 - 입력값: {}, {}", interestId, request);
     Interest interest = interestRepository.findById(interestId)
         .orElseThrow(() -> new InterestException(InterestErrorCode.INTEREST_NOT_FOUND,
             Map.of("interestId", interestId)));
 
     interest.updateKeywords(request.keywords());
-    log.info("interest update 완료 - interestId: {}", interestId);
 
-    return InterestResponse.from(interest);
+    log.info("관심사 수정 완료 - interestId: {}, name: {}", interestId, interest.getName());
+
+    return InterestDto.from(interest);
   }
 
   @Transactional
   public void deleteInterest(UUID interestId) {
-    log.debug("interest delete 시작 - 입력값: {}", interestId);
+    log.debug("관심사 삭제 시작 - 입력값: {}", interestId);
     if(!interestRepository.existsById(interestId)) {
       throw new InterestException(InterestErrorCode.INTEREST_NOT_FOUND, Map.of("interestId", interestId));
     }
@@ -80,13 +83,13 @@ public class InterestService {
     subscriptionRepository.deleteByInterestId(interestId);
     articleInterestRepository.deleteByInterestId(interestId);
     interestRepository.deleteById(interestId);
-    log.info("interest delete - interestId: {}", interestId);
+    log.info("관심사 삭제 완료 - interestId: {}", interestId);
   }
 
   @Transactional(readOnly = true)
-  public CursorPageResponse<InterestResponse> searchInterest(UUID userId,
+  public CursorPageResponse<InterestDto> searchInterest(UUID userId,
       InterestSearchRequest request) {
-    log.debug("interest search 시작 - 입력값: {}, {}", userId, request);
+    log.debug("관심사 목록 조회 시작 - 요청 조건: {}", request);
     if (!userRepository.existsById(userId)) {
       throw new UserException(UserErrorCode.INVALID_CREDENTIALS, Map.of("userId", userId));
     }
@@ -107,13 +110,13 @@ public class InterestService {
         .map(Interest::getId)
         .toList();
 
-    List<UUID> subscribedInterestIds = subscriptionRepository.findSubscribedInterestIds(userId,
+    Set<UUID> subscribedInterestIds = subscriptionRepository.findSubscribedInterestIds(userId,
         interestIds);
 
-    List<InterestResponse> content = interestList.stream()
+    List<InterestDto> content = interestList.stream()
         .map(interest -> {
           boolean subscribedByMe = subscribedInterestIds.contains(interest.getId());
-          return InterestResponse.of(interest, subscribedByMe);
+          return InterestDto.of(interest, subscribedByMe);
         })
         .toList();
 
@@ -125,9 +128,9 @@ public class InterestService {
 
     String nextAfter = hasNext ? lastInterest.getCreatedAt().format(CURSOR_DATE_FORMATTER) : null;
 
-    log.debug("interest search 완료 - 응답 사이즈: {}, hasNext: {}", content.size(), hasNext);
+    log.debug("관심사 목록 조회 완료 - 응답 사이즈: {}, hasNext: {}", content.size(), hasNext);
 
-    return new CursorPageResponse<InterestResponse>(
+    return new CursorPageResponse<InterestDto>(
         content,
         hasNext ? nextCursor : null,
         nextAfter,
@@ -153,8 +156,6 @@ public class InterestService {
 
     if (candidates.isEmpty()) return;
 
-    LevenshteinDistance levenshteinDistance = new LevenshteinDistance();
-
     // 새 단어를 자모 분해 처리
     String decomposedNewName = Normalizer.normalize(newName, Form.NFD);
 
@@ -165,7 +166,7 @@ public class InterestService {
       String decomposedExistingName = Normalizer.normalize(existingName, Form.NFD);
 
       // 쪼개진 모음/자음 상태로 거리 계산
-      int distance = levenshteinDistance.apply(decomposedNewName, decomposedExistingName);
+      int distance = LEVENSHTEIN_DISTANCE.apply(decomposedNewName, decomposedExistingName);
       int maxLen = Math.max(decomposedNewName.length(), decomposedExistingName.length());
 
       double similarity = 1.0 - ((double) distance / maxLen);
