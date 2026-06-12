@@ -18,12 +18,18 @@ public interface ArticleInterestRepository extends JpaRepository<ArticleInterest
   @Query("SELECT ai.interest.id FROM ArticleInterest ai WHERE ai.article.id = :articleId")
   List<UUID> findInterestIdsByArticleId(@Param("articleId") UUID articleId);
 
-  // [복구용] 매핑 테이블 복구 (이미 연결되어 있으면 무시 - ON CONFLICT DO NOTHING)
+  // [복구용] 매핑 테이블 복구 (새로운 기사와 관심사를 연결)
+  // 이미 존재하는 매핑이거나 관심사가 DB에 존재하지 않으면 에러 없이 무시
   @Modifying(clearAutomatically = true)
   @Query(value = """
       INSERT INTO article_interests (id, article_id, interest_id)
-      VALUES (:id, :articleId, :interestId)
-      ON CONFLICT (article_id, interest_id) DO NOTHING
+      SELECT :id, :articleId, :interestId
+      WHERE NOT EXISTS (
+          SELECT 1 FROM article_interests WHERE article_id = :articleId AND interest_id = :interestId
+      )
+      AND EXISTS (
+          SELECT 1 FROM interests WHERE id = :interestId
+      )
       """, nativeQuery = true)
-  void insertIgnoreMapping(@Param("id") UUID id, @Param("articleId") UUID articleId, @Param("interestId") UUID interestId);
+  int insertIgnoreMapping(@Param("id") UUID id, @Param("articleId") UUID articleId, @Param("interestId") UUID interestId);
 }
