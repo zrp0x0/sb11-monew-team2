@@ -26,7 +26,7 @@ public class ArticleBackupScheduler {
 
   @Scheduled(cron = "0 0 3 * * *", zone = "${scheduling.zone:Asia/Seoul}")
   public void runArticleBackupJob() {
-    String targetDate = LocalDate.now(schedulerClock).minusDays(1)
+    String targetDate = LocalDate.now(schedulerClock).minusDays(0)
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
     JobParameters jobParameters = new JobParametersBuilder()
