@@ -1,14 +1,4 @@
-FROM eclipse-temurin:17-jdk-alpine AS build
-WORKDIR /app
-
-# 1) 빌드 설정 파일 먼저 복사
-COPY gradlew settings.gradle build.gradle ./
-COPY gradle ./gradle
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon > /dev/null 2>&1 || true
-
-# 2) 소스 복사 후 bootJar 생성
-COPY src ./src
-RUN ./gradlew clean bootJar --no-daemon -x test
+# ... (위의 build 단계는 그대로 유지)
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
@@ -16,9 +6,17 @@ WORKDIR /app
 ENV TZ=Asia/Seoul
 ENV JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Seoul"
 
+# 1. 사용자 생성
 RUN addgroup -S monew && adduser -S monew -G monew
 
+# 2. 로그 폴더 생성 및 권한 부여 
+RUN mkdir -p /app/.logs && chown -R monew:monew /app/.logs
+
+# 3. JAR 파일 복사
 COPY --from=build /app/build/libs/*.jar app.jar
+
+# 4. 소유권 변경 (혹시 모를 app.jar 권한까지 확실하게)
+RUN chown monew:monew app.jar
 
 USER monew:monew
 
