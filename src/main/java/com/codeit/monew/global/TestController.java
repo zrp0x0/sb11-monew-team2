@@ -2,6 +2,7 @@ package com.codeit.monew.global;
 
 import com.codeit.monew.batch.backup.scheduler.ArticleBackupScheduler;
 import com.codeit.monew.batch.collector.service.NewsCollectorService;
+import com.codeit.monew.batch.delete.ArticleHardDeleteScheduler;
 import com.codeit.monew.batch.delete.CommentHardDeleteBatchJob;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class TestController {
   private final NewsCollectorService newsCollectorService;
   private final ArticleBackupScheduler articleBackupScheduler;
   private final CommentHardDeleteBatchJob commentHardDeleteBatchJob;
+  private final ArticleHardDeleteScheduler articleHardDeleteScheduler;
 
   @GetMapping()
   public String testGetMapping() {
@@ -42,5 +44,11 @@ public class TestController {
   @GetMapping("/comment-hard-delete")
   public void hardDeleteComment() {
     commentHardDeleteBatchJob.execute();
+  }
+
+  @Operation(summary = "수동 기사 물리 삭제 작업", description = "수동으로 기사 물리 삭제를 돌립니다.")
+  @GetMapping("/article-hard-delete")
+  public void hardDeleteArticle() {
+    articleHardDeleteScheduler.executeDailyArticleCleanup();
   }
 }
