@@ -5,9 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
 import com.codeit.monew.domain.article.dto.response.ArticleDto;
@@ -15,7 +13,11 @@ import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.exception.ArticleException;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
+import com.codeit.monew.domain.articleView.dto.response.ArticleViewDto;
 import com.codeit.monew.domain.articleView.repository.ArticleViewRepository;
+import com.codeit.monew.domain.articleView.entity.ArticleView;
+import com.codeit.monew.domain.user.repository.UserRepository;
+import com.codeit.monew.domain.user.entity.User;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -29,7 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils; // 추가됨
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ArticleServiceTest {
@@ -42,6 +44,9 @@ class ArticleServiceTest {
 
   @InjectMocks
   private ArticleService articleService;
+
+  @Mock
+  private UserRepository userRepository;
 
   @Test
   @DisplayName("서비스에서 지원하는 뉴스 기사 출처 목록 반환함")
@@ -91,12 +96,13 @@ class ArticleServiceTest {
     when(articleRepository.searchArticles(any(ArticleSearchRequest.class)))
         .thenReturn(articlePage);
 
-    // N+1 방어용 기사 조회 여부 리포지토리 Mock 처리
     when(articleViewRepository.findViewedArticleIds(eq(requestUserId), anyList()))
-        .thenReturn(Set.of()); // 빈 Set 반환 가정
-
+        .thenReturn(Set.of());
     // when
-    CursorPageResponse<ArticleDto> response = articleService.searchArticles(request, requestUserId);
+    CursorPageResponse<ArticleDto> response = articleService.searchArticles(
+        request,
+        requestUserId.toString()
+    );
 
     // then
     assertThat(response.content()).hasSize(1);
@@ -137,7 +143,10 @@ class ArticleServiceTest {
         .thenReturn(emptyPage);
 
     // when
-    CursorPageResponse<ArticleDto> response = articleService.searchArticles(request, requestUserId);
+    CursorPageResponse<ArticleDto> response = articleService.searchArticles(
+        request,
+        requestUserId.toString()
+    );
 
     // then
     assertThat(response.content()).isEmpty();
@@ -167,6 +176,9 @@ class ArticleServiceTest {
     when(articleRepository.findByIdAndDeletedAtIsNull(articleId))
         .thenReturn(Optional.of(article));
 
+    when(articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId))
+            .thenReturn(Optional.empty());
+
     // when
     ArticleDto response = articleService.getArticle(articleId, requestUserId.toString());
 
@@ -179,7 +191,9 @@ class ArticleServiceTest {
     assertThat(response.commentCount()).isEqualTo(0L);
     assertThat(response.viewCount()).isEqualTo(0L);
     assertThat(response.viewedByMe()).isFalse();
+    assertThat(response.viewedByMe()).isFalse();
 
+    verify(articleViewRepository).findByUserIdAndArticleId(requestUserId, articleId);
     verify(articleRepository).findByIdAndDeletedAtIsNull(articleId);
   }
 
@@ -224,5 +238,139 @@ class ArticleServiceTest {
         .isInstanceOf(ArticleException.class);
 
     verifyNoInteractions(articleRepository);
+  }
+
+  @Test
+  @DisplayName("뉴스 기사 단건 조회 시 이미 조회한 기사라면 viewedByMe가 true이다")
+  void getArticle_whenViewedByMeIsTrue() {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+
+    Article article = Article.create(
+            ArticleSource.NAVER,
+            "https://news.naver.com/viewed",
+            "조회한 기사",
+            "조회한 기사 요약",
+            LocalDateTime.of(2026, 5, 27, 10, 30)
+    );
+
+    ReflectionTestUtils.setField(article, "id", articleId);
+
+    User user = User.create("viewer@example.com", "viewer", "password-hash");
+    ReflectionTestUtils.setField(user, "id", requestUserId);
+
+    ArticleView articleView = ArticleView.create(user, article);
+    ReflectionTestUtils.setField(articleView, "id", UUID.randomUUID());
+
+    when(articleRepository.findByIdAndDeletedAtIsNull(articleId))
+            .thenReturn(Optional.of(article));
+    when(articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId))
+            .thenReturn(Optional.of(articleView));
+
+    // when
+    ArticleDto response = articleService.getArticle(articleId, requestUserId.toString());
+
+    // then
+    assertThat(response.id()).isEqualTo(articleId);
+    assertThat(response.viewedByMe()).isTrue();
+
+    verify(articleRepository).findByIdAndDeletedAtIsNull(articleId);
+    verify(articleViewRepository).findByUserIdAndArticleId(requestUserId, articleId);
+  }
+
+  @Test
+  @DisplayName("기사 뷰 등록 시 처음 조회한 기사라면 ArticleView를 저장하고 조회 수를 증가시킨다")
+  void registerArticleView_firstView_savesArticleViewAndIncreaseViewCount() {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+
+    User user = User.create("viewer@example.com", "viewer", "password-hash");
+    ReflectionTestUtils.setField(user, "id", requestUserId);
+
+    Article article = Article.create(
+            ArticleSource.NAVER,
+            "https://news.naver.com/first-view",
+            "처음 조회한 기사",
+            "처음 조회한 기사 요약",
+            LocalDateTime.of(2026, 5, 27, 10, 30)
+    );
+    ReflectionTestUtils.setField(article, "id", articleId);
+
+    ArticleView savedArticleView = ArticleView.create(user, article);
+    ReflectionTestUtils.setField(savedArticleView, "id", UUID.randomUUID());
+
+    when(userRepository.findById(requestUserId))
+            .thenReturn(Optional.of(user));
+    when(articleRepository.findById(articleId))
+            .thenReturn(Optional.of(article));
+    when(articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId))
+            .thenReturn(Optional.empty());
+    when(articleViewRepository.save(any(ArticleView.class)))
+            .thenReturn(savedArticleView);
+
+    // when
+    ArticleViewDto response = articleService.registerArticleView(
+            articleId,
+            requestUserId.toString()
+    );
+
+    // then
+    assertThat(response.articleId()).isEqualTo(articleId);
+    assertThat(response.viewedBy()).isEqualTo(requestUserId);
+    assertThat(article.getViewCount()).isEqualTo(1L);
+
+    verify(userRepository).findById(requestUserId);
+    verify(articleRepository).findById(articleId);
+    verify(articleViewRepository).findByUserIdAndArticleId(requestUserId, articleId);
+    verify(articleViewRepository).save(any(ArticleView.class));
+  }
+
+  @Test
+  @DisplayName("기사 뷰 등록 시 이미 조회한 기사라면 기존 ArticleView를 반환하고 조회 수를 증가시키지 않는다")
+  void registerArticleView_alreadyViewed_returnsExistingArticleViewWithoutIncreasingViewCount() {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+
+    User user = User.create("viewer@example.com", "viewer", "password-hash");
+    ReflectionTestUtils.setField(user, "id", requestUserId);
+
+    Article article = Article.create(
+            ArticleSource.NAVER,
+            "https://news.naver.com/already-viewed",
+            "이미 조회한 기사",
+            "이미 조회한 기사 요약",
+            LocalDateTime.of(2026, 5, 27, 10, 30)
+    );
+    ReflectionTestUtils.setField(article, "id", articleId);
+    ReflectionTestUtils.setField(article, "viewCount", 1L);
+
+    ArticleView existingArticleView = ArticleView.create(user, article);
+    ReflectionTestUtils.setField(existingArticleView, "id", UUID.randomUUID());
+
+    when(userRepository.findById(requestUserId))
+            .thenReturn(Optional.of(user));
+    when(articleRepository.findById(articleId))
+            .thenReturn(Optional.of(article));
+    when(articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId))
+            .thenReturn(Optional.of(existingArticleView));
+
+    // when
+    ArticleViewDto response = articleService.registerArticleView(
+            articleId,
+            requestUserId.toString()
+    );
+
+    // then
+    assertThat(response.articleId()).isEqualTo(articleId);
+    assertThat(response.viewedBy()).isEqualTo(requestUserId);
+    assertThat(article.getViewCount()).isEqualTo(1L);
+
+    verify(userRepository).findById(requestUserId);
+    verify(articleRepository).findById(articleId);
+    verify(articleViewRepository).findByUserIdAndArticleId(requestUserId, articleId);
+    verify(articleViewRepository, never()).save(any(ArticleView.class));
   }
 }

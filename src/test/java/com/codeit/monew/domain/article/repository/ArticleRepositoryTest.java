@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.codeit.monew.domain.article.dto.request.ArticleSearchRequest;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
+import com.codeit.monew.domain.article.entity.ArticleInterest;
+import com.codeit.monew.domain.interest.entity.Interest;
 import com.codeit.monew.global.config.QuerydslConfig;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import jakarta.persistence.EntityManager;
@@ -804,5 +806,55 @@ class ArticleRepositoryTest {
     DateTimeProvider dateTimeProvider() {
       return () -> Optional.of(LocalDateTime.of(2026, 5, 28, 0, 0));
     }
+  }
+
+  @Test
+  @DisplayName("interestId 조건으로 연결된 기사만 조회함")
+  void searchArticles_filterByInterestId() {
+    // given
+    Interest interest = Interest.create("경제", List.of("금리", "환율"));
+    em.persist(interest);
+
+    Article mappedArticle = Article.create(
+            ArticleSource.HANKYUNG,
+            "https://www.hankyung.com/interest-mapped",
+            "금리 관련 기사",
+            "환율과 금리 관련 요약",
+            LocalDateTime.of(2026, 5, 27, 10, 30)
+    );
+
+    Article notMappedArticle = Article.create(
+            ArticleSource.HANKYUNG,
+            "https://www.hankyung.com/interest-not-mapped",
+            "금리 단어는 있지만 매핑되지 않은 기사",
+            "제목에는 키워드가 있지만 ArticleInterest가 없는 기사",
+            LocalDateTime.of(2026, 5, 27, 11, 30)
+    );
+
+    articleRepository.saveAllAndFlush(List.of(mappedArticle, notMappedArticle));
+    em.persist(ArticleInterest.create(mappedArticle, interest));
+    em.flush();
+    em.clear();
+
+    ArticleSearchRequest request = new ArticleSearchRequest(
+            null,
+            interest.getId(),
+            null,
+            null,
+            null,
+            "publishDate",
+            "DESC",
+            null,
+            null,
+            10,
+            UUID.randomUUID()
+    );
+
+    // when
+    CursorPageResponse<Article> response = articleRepository.searchArticles(request);
+
+    // then
+    assertThat(response.content()).hasSize(1);
+    assertThat(response.content().get(0).getTitle()).isEqualTo("금리 관련 기사");
   }
 }
