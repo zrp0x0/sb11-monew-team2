@@ -142,18 +142,18 @@ jobs:
 
           content = template_path.read_text(encoding="utf-8")
           replacements = {
-              "AWS_REGION": os.environ["AWS_REGION"],
-              "AWS_S3_BUCKET_NAME": os.environ["AWS_S3_BUCKET_NAME"],
-              "ECS_TASK_FAMILY": os.environ["ECS_TASK_FAMILY"],
-              "ECS_CONTAINER_NAME": os.environ["ECS_CONTAINER_NAME"],
-              "ECS_TASK_EXECUTION_ROLE_ARN": os.environ["ECS_TASK_EXECUTION_ROLE_ARN"],
-              "ECS_TASK_ROLE_ARN": os.environ["ECS_TASK_ROLE_ARN"],
-              "CLOUDWATCH_LOG_GROUP": os.environ["CLOUDWATCH_LOG_GROUP"],
-              "PROD_DATASOURCE_URL_SECRET_ARN": os.environ["PROD_DATASOURCE_URL_SECRET_ARN"],
-              "PROD_DATASOURCE_USERNAME_SECRET_ARN": os.environ["PROD_DATASOURCE_USERNAME_SECRET_ARN"],
-              "PROD_DATASOURCE_PASSWORD_SECRET_ARN": os.environ["PROD_DATASOURCE_PASSWORD_SECRET_ARN"],
-              "PROD_NAVER_CLIENT_ID_SECRET_ARN": os.environ["PROD_NAVER_CLIENT_ID_SECRET_ARN"],
-              "PROD_NAVER_CLIENT_SECRET_SECRET_ARN": os.environ["PROD_NAVER_CLIENT_SECRET_SECRET_ARN"],
+              "AWS_REGION": os.environ["AWS_REGION"].strip(),
+              "AWS_S3_BUCKET_NAME": os.environ["AWS_S3_BUCKET_NAME"].strip(),
+              "ECS_TASK_FAMILY": os.environ["ECS_TASK_FAMILY"].strip(),
+              "ECS_CONTAINER_NAME": os.environ["ECS_CONTAINER_NAME"].strip(),
+              "ECS_TASK_EXECUTION_ROLE_ARN": os.environ["ECS_TASK_EXECUTION_ROLE_ARN"].strip(),
+              "ECS_TASK_ROLE_ARN": os.environ["ECS_TASK_ROLE_ARN"].strip(),
+              "CLOUDWATCH_LOG_GROUP": os.environ["CLOUDWATCH_LOG_GROUP"].strip(),
+              "PROD_DATASOURCE_URL_SECRET_ARN": os.environ["PROD_DATASOURCE_URL_SECRET_ARN"].strip(),
+              "PROD_DATASOURCE_USERNAME_SECRET_ARN": os.environ["PROD_DATASOURCE_USERNAME_SECRET_ARN"].strip(),
+              "PROD_DATASOURCE_PASSWORD_SECRET_ARN": os.environ["PROD_DATASOURCE_PASSWORD_SECRET_ARN"].strip(),
+              "PROD_NAVER_CLIENT_ID_SECRET_ARN": os.environ["PROD_NAVER_CLIENT_ID_SECRET_ARN"].strip(),
+              "PROD_NAVER_CLIENT_SECRET_SECRET_ARN": os.environ["PROD_NAVER_CLIENT_SECRET_SECRET_ARN"].strip(),
           }
 
           for key, value in replacements.items():
