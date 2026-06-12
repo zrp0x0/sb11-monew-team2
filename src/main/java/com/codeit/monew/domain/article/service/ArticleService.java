@@ -40,8 +40,11 @@ public class ArticleService {
   }
 
   @Transactional(readOnly = true)
-  public CursorPageResponse<ArticleDto> searchArticles(ArticleSearchRequest request,
-      UUID requestUserId) {
+  public CursorPageResponse<ArticleDto> searchArticles(
+      ArticleSearchRequest request,
+      String requestUserIdHeader) {
+
+    UUID requestUserId = parseArticleRequestUserId(requestUserIdHeader);
 
     CursorPageResponse<Article> articlePage = articleRepository.searchArticles(request);
 
@@ -56,7 +59,6 @@ public class ArticleService {
       );
     }
 
-    // N + 1 문제 해결
     List<UUID> currentArticleIds = articlePage.content().stream()
         .map(Article::getId)
         .toList();
@@ -102,6 +104,21 @@ public class ArticleService {
         });
   }
 
+  @Transactional(readOnly = true)
+  public ArticleDto getArticle(UUID articleId, String requestUserId) {
+    UUID parsedRequestUserId = parseArticleRequestUserId(requestUserId);
+
+    Article article = articleRepository.findByIdAndDeletedAtIsNull(articleId)
+            .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
+
+    boolean viewedByMe = articleViewRepository.findByUserIdAndArticleId(
+            parsedRequestUserId,
+            articleId
+    ).isPresent();
+
+    return ArticleDto.from(article, viewedByMe);
+  }
+
   private UUID parseArticleViewRequestUserId(String requestUserIdHeader) {
     if (!StringUtils.hasText(requestUserIdHeader)) {
       throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
@@ -112,17 +129,6 @@ public class ArticleService {
     } catch (IllegalArgumentException e) {
       throw new UserException(UserErrorCode.REQUEST_USER_ID_REQUIRED);
     }
-  }
-
-  @Transactional(readOnly = true)
-  public ArticleDto getArticle(UUID articleId, String requestUserId) {
-    parseArticleRequestUserId(requestUserId);
-
-    Article article = articleRepository.findByIdAndDeletedAtIsNull(articleId)
-        .orElseThrow(() -> new ArticleException(ArticleErrorCode.ARTICLE_NOT_FOUND));
-
-    // Todo: viewedByMe false로 두고 추후 고도화
-    return ArticleDto.from(article, false);
   }
 
   private UUID parseArticleRequestUserId(String requestUserId) {

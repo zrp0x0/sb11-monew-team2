@@ -1,7 +1,7 @@
-package com.codeit.monew.global.batch;
+package com.codeit.monew.batch.delete;
 
+import com.codeit.monew.batch.delete.service.CommentHardDeleteChunkService;
 import com.codeit.monew.domain.comment.repository.CommentRepository;
-import com.codeit.monew.domain.commentLike.repository.CommentLikeRepository;
 import com.codeit.monew.global.monitoring.domain.JobRunStatus;
 import com.codeit.monew.global.monitoring.service.JobRunHistoryCommand;
 import com.codeit.monew.global.monitoring.service.JobRunHistoryService;
@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -25,15 +24,14 @@ public class CommentHardDeleteBatchJob {
   private static final String JOB_NAME = "commentHardDelete";
 
   private final CommentRepository commentRepository;
-  private final CommentLikeRepository commentLikeRepository;
+  private final CommentHardDeleteChunkService chunkService;
   private final JobRunHistoryService jobRunHistoryService;
   private final MonewMetrics monewMetrics;
 
   @Value("${batch.comment.hard-delete.batch-size:1000}")
   private int batchsize;
 
-  @Transactional
-  @Scheduled(cron = "0 0 2 * * *", zone = "${scheduling.zone:Asia/Seoul}")
+  @Scheduled(cron = "0 0 2 * * *", zone = "${scheduling.zone:Asia/Seoul}") // 매일 새벽 2시
   public void execute() {
     LocalDateTime startedAt = LocalDateTime.now();
     long startedNanos = System.nanoTime();
@@ -48,8 +46,7 @@ public class CommentHardDeleteBatchJob {
       do {
         ids = commentRepository.findIdsByDeletedAtBefore(threshold, batchsize);
         if (!ids.isEmpty()) {
-          commentLikeRepository.hardDeleteAllByCommentIdIn(ids);
-          commentRepository.hardDeleteAllByIdIn(ids);
+          chunkService.deleteChunk(ids);
           totalDeleted += ids.size();
         }
       } while (ids.size() == batchsize);

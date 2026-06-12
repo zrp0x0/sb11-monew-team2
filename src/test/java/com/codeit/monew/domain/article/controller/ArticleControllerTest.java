@@ -109,8 +109,9 @@ class ArticleControllerTest {
         false
     );
 
-    // 서비스 메서드 인자가 2개(request, requestUserId)로 바뀐 것 반영
-    when(articleService.searchArticles(any(ArticleSearchRequest.class), eq(requestUserId)))
+    String requestUserIdHeader = requestUserId.toString();
+
+    when(articleService.searchArticles(any(ArticleSearchRequest.class), eq(requestUserIdHeader)))
         .thenReturn(response);
 
     // when & then
@@ -118,7 +119,7 @@ class ArticleControllerTest {
             .param("orderBy", "publishDate")
             .param("direction", "DESC")
             .param("limit", "10")
-            .header("Monew-Request-User-ID", requestUserId.toString()))
+            .header("Monew-Request-User-ID", requestUserIdHeader))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].id").value(articleId.toString()))
         .andExpect(jsonPath("$.content[0].source").value("NAVER"))
@@ -132,8 +133,7 @@ class ArticleControllerTest {
     ArgumentCaptor<ArticleSearchRequest> captor =
         ArgumentCaptor.forClass(ArticleSearchRequest.class);
 
-    // 파라미터 2개 검증
-    verify(articleService).searchArticles(captor.capture(), eq(requestUserId));
+    verify(articleService).searchArticles(captor.capture(), eq(requestUserIdHeader));
 
     ArticleSearchRequest request = captor.getValue();
     assertThat(request.orderBy()).isEqualTo("publishDate");
@@ -294,12 +294,6 @@ class ArticleControllerTest {
     verify(articleService).getArticle(articleId, requestUserId.toString());
   }
 
-  private ObjectMapper objectMapper() {
-    return new ObjectMapper()
-        .registerModule(new JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-  }
-
   @Test
   @DisplayName("뉴스 기사 목록 조회 시 sourceIn[] 배열 파라미터 처리")
   void searchArticles_withSourceInBrackets_success() throws Exception {
@@ -315,7 +309,9 @@ class ArticleControllerTest {
             false
     );
 
-    when(articleService.searchArticles(any(ArticleSearchRequest.class), eq(requestUserId)))
+    String requestUserIdHeader = requestUserId.toString();
+
+    when(articleService.searchArticles(any(ArticleSearchRequest.class), eq(requestUserIdHeader)))
             .thenReturn(response);
 
     // when & then
@@ -324,15 +320,79 @@ class ArticleControllerTest {
                     .param("orderBy", "publishDate")
                     .param("direction", "DESC")
                     .param("limit", "10")
-                    .header("Monew-Request-User-ID", requestUserId.toString()))
+                    .header("Monew-Request-User-ID", requestUserIdHeader))
             .andExpect(status().isOk());
 
     ArgumentCaptor<ArticleSearchRequest> captor =
             ArgumentCaptor.forClass(ArticleSearchRequest.class);
 
-    verify(articleService).searchArticles(captor.capture(), eq(requestUserId));
+    verify(articleService).searchArticles(captor.capture(), eq(requestUserIdHeader));
 
     ArticleSearchRequest request = captor.getValue();
     assertThat(request.sourceIn()).containsExactly(ArticleSource.HANKYUNG);
+  }
+
+  @Test
+  @DisplayName("뉴스 기사 목록 조회 시 sourceIn과 sourceIn[]를 병합하고 중복을 제거한다")
+  void searchArticles_mergeSourceInAndSourceInBrackets_success() throws Exception {
+    // given
+    UUID requestUserId = UUID.randomUUID();
+
+    CursorPageResponse<ArticleDto> response = new CursorPageResponse<>(
+            List.of(),
+            null,
+            null,
+            10,
+            0L,
+            false
+    );
+
+    String requestUserIdHeader = requestUserId.toString();
+
+    when(articleService.searchArticles(any(ArticleSearchRequest.class), eq(requestUserIdHeader)))
+            .thenReturn(response);
+
+    // when & then
+    mockMvc.perform(get("/api/articles")
+                    .param("sourceIn", "NAVER")
+                    .param("sourceIn[]", "NAVER", "HANKYUNG")
+                    .param("orderBy", "publishDate")
+                    .param("direction", "DESC")
+                    .param("limit", "10")
+                    .header("Monew-Request-User-ID", requestUserIdHeader))
+            .andExpect(status().isOk());
+
+    ArgumentCaptor<ArticleSearchRequest> captor =
+            ArgumentCaptor.forClass(ArticleSearchRequest.class);
+
+    verify(articleService).searchArticles(captor.capture(), eq(requestUserIdHeader));
+
+    ArticleSearchRequest request = captor.getValue();
+
+    assertThat(request.sourceIn()).containsExactly(
+            ArticleSource.NAVER,
+            ArticleSource.HANKYUNG
+    );
+  }
+
+  private ObjectMapper objectMapper() {
+    return new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+  }
+
+  @Test
+  @DisplayName("뉴스 기사 목록 조회 시 limit이 없으면 400 Bad Request를 반환한다")
+  void searchArticles_fail_whenLimitMissing() throws Exception {
+    // given
+    UUID requestUserId = UUID.randomUUID();
+
+    // when & then
+    mockMvc.perform(get("/api/articles")
+                    .param("orderBy", "publishDate")
+                    .param("direction", "DESC")
+                    .header("Monew-Request-User-ID", requestUserId.toString()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
   }
 }
