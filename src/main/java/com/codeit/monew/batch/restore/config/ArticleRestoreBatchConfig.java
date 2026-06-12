@@ -55,7 +55,7 @@ public class ArticleRestoreBatchConfig {
   private final InterestRepository interestRepository;
   private final AmazonS3 amazonS3;
 
-  @Value("${batch.chunk-size:500}")
+  @Value("${batch.chunk-size:1000}")
   private int chunkSize;
 
   @Value("${aws.s3.bucket}")

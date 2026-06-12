@@ -20,7 +20,7 @@ spring:
       enabled: false
 
 batch:
-  chunk-size: 500
+  chunk-size: 1000
 
 external-api:
   naver:

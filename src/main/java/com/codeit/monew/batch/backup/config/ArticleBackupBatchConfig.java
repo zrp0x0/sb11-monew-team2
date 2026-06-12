@@ -45,7 +45,7 @@ public class ArticleBackupBatchConfig {
 
   private final ArticleInterestRepository articleInterestRepository;
 
-  @Value("${batch.chunk-size:500}")
+  @Value("${batch.chunk-size:1000}")
   private int chunkSize; // 한 번에 DB에서 읽고 처리할 데이터의 양
 
   @Value("${aws.s3.bucket}")
