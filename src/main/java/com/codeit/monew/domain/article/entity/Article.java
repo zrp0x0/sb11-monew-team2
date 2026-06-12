@@ -1,0 +1,106 @@
+package com.codeit.monew.domain.article.entity;
+
+import com.codeit.monew.global.entity.BaseSoftDeleteEntity;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+import static com.codeit.monew.global.entity.BaseSoftDeleteEntity.IS_DELETED_FALSE;
+
+@Entity
+@Table(
+        name = "articles",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_articles_source_url", columnNames = "source_url")
+        }
+)
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction(IS_DELETED_FALSE)
+public class Article extends BaseSoftDeleteEntity {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "source", nullable = false, length = 30)
+  private ArticleSource source;
+
+  @Column(name = "source_url", nullable = false, length = 2048)
+  private String sourceUrl;
+
+  @Column(name = "title", nullable = false, length = 500)
+  private String title;
+
+  @Column(name = "summary", nullable = false, length = 2000)
+  private String summary;
+
+  @Column(name = "published_at", nullable = false)
+  private LocalDateTime publishedAt;
+
+  @Column(name = "view_count", nullable = false)
+  private long viewCount = 0L;
+
+  @Column(name = "comment_count", nullable = false)
+  private long commentCount = 0L;
+
+  private Article(
+          ArticleSource source,
+          String sourceUrl,
+          String title,
+          String summary,
+          LocalDateTime publishedAt
+  ) {
+    this.source = source;
+    this.sourceUrl = sourceUrl;
+    this.title = title;
+    this.summary = summary;
+    this.publishedAt = publishedAt;
+  }
+
+  public static Article create(
+          ArticleSource source,
+          String sourceUrl,
+          String title,
+          String summary,
+          LocalDateTime publishedAt
+  ) {
+    return new Article(source, sourceUrl, title, summary, publishedAt);
+  }
+
+  public static Article restore(UUID id, ArticleSource source, String sourceUrl, String title, String summary, LocalDateTime publishedAt, LocalDateTime createdAt) {
+    Article article = new Article();
+    article.id = id;
+    article.source = source;
+    article.sourceUrl = sourceUrl;
+    article.title = title;
+    article.summary = summary;
+    article.publishedAt = publishedAt;
+    article.setCreatedAtForRestore(createdAt);
+    return article;
+  }
+
+  public void increaseViewCount() {
+    if (this.viewCount == Long.MAX_VALUE) {
+      return;
+    }
+
+    this.viewCount++;
+  }
+
+  public void increaseCommentCount() {
+    this.commentCount++;
+  }
+
+  public void decreaseCommentCount() {
+    if (this.commentCount > 0) {
+      this.commentCount--;
+    }
+  }
+}

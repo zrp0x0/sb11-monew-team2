@@ -1,0 +1,165 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: [ "main", "develop" ]
+  push:
+    branches: [ "main", "develop" ]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: monew_test
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: pass
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 1. 내 코드 가져오기 (Checkout)
+        uses: actions/checkout@v3
+
+      - name: 2. 자바(JDK) 17 설치 및 Gradle 캐시 설정
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+
+      # 공식 Gradle Action 추가
+      - name: 2-1. Gradle 캐시 설정
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: 3. gradlew에 실행 권한 부여하기
+        run: chmod +x gradlew
+
+      - name: 4. 데이터베이스 연결 및 프로젝트 빌드, 커버리지 검사, 배포 산출물 생성하기
+        # 테스트 실행 후, 80% 룰(jacocoTestCoverageVerification)까지 검사
+        # CD 준비를 위해 bootJar 실행 JAR 생성 여부까지 검증
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/monew_test
+          SPRING_DATASOURCE_USERNAME: user
+          SPRING_DATASOURCE_PASSWORD: pass
+        run: ./gradlew test jacocoTestCoverageVerification bootJar --no-daemon
+
+      - name: 5. Flyway 검증용 데이터베이스 준비하기
+        # 테스트 실행 후 public schema에 남을 수 있는 batch metadata와 분리하기 위해 별도 DB를 생성
+        run: |
+          docker run --rm --network host -e PGPASSWORD=pass postgres:16-alpine \
+            sh -c 'dropdb -h localhost -p 5433 -U user --if-exists monew_flyway && createdb -h localhost -p 5433 -U user monew_flyway'
+
+      - name: 6. Flyway migration 및 staging profile 검증하기
+        env:
+          SPRING_PROFILES_ACTIVE: staging
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/monew_flyway
+          SPRING_DATASOURCE_USERNAME: user
+          SPRING_DATASOURCE_PASSWORD: pass
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
+          SPRING_BATCH_JOB_ENABLED: false
+        run: |
+          java -jar build/libs/*.jar --server.port=18081 > flyway-staging.log 2>&1 &
+          APP_PID=$!
+
+          trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
+
+          for i in {1..30}; do
+            if curl -fsS http://localhost:18081/actuator/health | grep -q '"status":"UP"'; then
+              echo "Flyway migration and staging profile validation passed"
+              exit 0
+            fi
+
+            if ! kill -0 "$APP_PID" 2>/dev/null; then
+              cat flyway-staging.log
+              exit 1
+            fi
+
+            echo "Waiting for Flyway migration validation... ($i/30)"
+            sleep 2
+          done
+
+          cat flyway-staging.log
+          exit 1
+
+      - name: 7. Docker 이미지 빌드 검증하기
+        # Docker image build 가능 여부를 검증하며, PR 단계에서는 registry push를 수행하지 않음
+        run: docker build --tag monew:${{ github.sha }} .
+
+      - name: 8. Docker 컨테이너 실행 및 헬스 체크 검증하기
+        # GitHub Actions runner의 PostgreSQL service container에 연결해 실제 container 실행 가능 여부를 검증
+        run: |
+          docker rm -f monew-health-check || true
+
+          docker run -d \
+            --name monew-health-check \
+            --network host \
+            -e SPRING_PROFILES_ACTIVE=dev \
+            -e SERVER_PORT=18080 \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/monew_test \
+            -e SPRING_DATASOURCE_USERNAME=user \
+            -e SPRING_DATASOURCE_PASSWORD=pass \
+            monew:${{ github.sha }}
+
+          for i in {1..30}; do
+            if curl -fsS http://localhost:18080/actuator/health | grep -q '"status":"UP"'; then
+              echo "Health check passed"
+              exit 0
+            fi
+
+            echo "Waiting for application health check... ($i/30)"
+            sleep 2
+          done
+
+          docker logs monew-health-check
+          exit 1
+
+      - name: 9. Docker 컨테이너 정리하기
+        if: always()
+        run: docker rm -f monew-health-check || true
+
+      - name: 10. 배포 산출물(JAR) 업로드하기
+        uses: actions/upload-artifact@v4
+        with:
+          name: monew-boot-jar
+          path: build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 11. GHCR 로그인하기
+        if: github.event_name == 'push'
+        # GITHUB_TOKEN을 사용하여 GitHub Container Registry에 로그인
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: 12. Docker 이미지 태그 생성 및 GHCR 업로드하기
+        if: github.event_name == 'push'
+        # develop/main 최종 커밋 기준 image를 GHCR에 업로드
+        run: |
+          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY,,}"
+
+          if [ "${GITHUB_REF_NAME}" = "develop" ]; then
+            docker tag monew:${GITHUB_SHA} "${IMAGE_NAME}:develop-${GITHUB_SHA}"
+            docker tag monew:${GITHUB_SHA} "${IMAGE_NAME}:staging"
+            docker push "${IMAGE_NAME}:develop-${GITHUB_SHA}"
+            docker push "${IMAGE_NAME}:staging"
+          elif [ "${GITHUB_REF_NAME}" = "main" ]; then
+            docker tag monew:${GITHUB_SHA} "${IMAGE_NAME}:main-${GITHUB_SHA}"
+            docker tag monew:${GITHUB_SHA} "${IMAGE_NAME}:production"
+            docker push "${IMAGE_NAME}:main-${GITHUB_SHA}"
+            docker push "${IMAGE_NAME}:production"
+          fi

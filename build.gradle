@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.14'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'jacoco'
 }
 
 group = 'com.codeit'
@@ -18,15 +19,26 @@ repositories {
     mavenCentral()
 }
 
+jacoco {
+    toolVersion = "0.8.11"
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.flywaydb:flyway-core'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.16'
+    implementation 'org.apache.commons:commons-text:1.10.0' // 문자열 유사도 알고리즘 의존성 추가
+    implementation 'org.springframework.boot:spring-boot-starter-batch' // Spring Batch
+    implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE' // AWS S3
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.batch:spring-batch-test'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
@@ -35,12 +47,81 @@ dependencies {
     annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
     annotationProcessor "jakarta.annotation:jakarta.annotation-api"
     annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+    runtimeOnly 'com.h2database:h2'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:2025.0.2"
+    }
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy 'jacocoTestReport' // 테스트가 끝나면 커버리지 리포트를 생성하도록 설정
+}
+
+def Qdomains = []
+for (qPattern in '**/QA'..'**/QZ') {
+    Qdomains.add(qPattern + '*')
+}
+
+// 커버리지 리포트 생성 설정
+jacocoTestReport {
+    dependsOn test
+    reports {
+        html.required = true
+        xml.required = true
+    }
+
+    // 리포트 생성 시 Q클래스 제외
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it,
+                    includes: [
+                            'com/codeit/monew/domain/**/service/**',
+                    ],
+                    excludes: Qdomains)
+        }))
+    }
+}
+
+jacocoTestCoverageVerification {
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it,
+                    includes: [
+                            'com/codeit/monew/domain/**/service/**',
+                    ],
+                    excludes: Qdomains)
+        }))
+    }
+    violationRules {
+        rule {
+            element = 'CLASS'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+def querydslDir = "$buildDir/generated/querydsl"
+
+sourceSets {
+    main.java.srcDirs += [ querydslDir ]
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.getGeneratedSourceOutputDirectory().set(file(querydslDir))
 }
 
 clean {
+    delete file(querydslDir)
     delete file('src/main/generated')
 }

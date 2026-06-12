@@ -1,0 +1,186 @@
+package com.codeit.monew.domain.interest.service;
+
+import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
+import com.codeit.monew.domain.interest.dto.request.InterestRegisterRequest;
+import com.codeit.monew.domain.interest.dto.request.InterestSearchRequest;
+import com.codeit.monew.domain.interest.dto.request.InterestUpdateRequest;
+import com.codeit.monew.domain.interest.dto.response.InterestDto;
+import com.codeit.monew.domain.interest.entity.Interest;
+import com.codeit.monew.domain.interest.exception.InterestErrorCode;
+import com.codeit.monew.domain.interest.exception.InterestException;
+import com.codeit.monew.domain.interest.repository.InterestRepository;
+import com.codeit.monew.domain.subscription.repository.SubscriptionRepository;
+import com.codeit.monew.domain.user.exception.UserErrorCode;
+import com.codeit.monew.domain.user.exception.UserException;
+import com.codeit.monew.domain.user.repository.UserRepository;
+import com.codeit.monew.global.dto.CursorPageResponse;
+import java.text.Normalizer;
+import java.text.Normalizer.Form;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.text.similarity.LevenshteinDistance;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class InterestService {
+
+  private final InterestRepository interestRepository;
+  private final UserRepository userRepository;
+  private final SubscriptionRepository subscriptionRepository;
+  private final ArticleInterestRepository articleInterestRepository;
+
+  private static final DateTimeFormatter CURSOR_DATE_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+  private static final LevenshteinDistance LEVENSHTEIN_DISTANCE = LevenshteinDistance.getDefaultInstance();
+
+  @Transactional
+  public InterestDto createInterest(InterestRegisterRequest request) {
+    log.debug("관심사 등록 시작 - 입력값: {}", request);
+    String name = request.name();
+
+    if (interestRepository.existsByName(name)) {
+      throw new InterestException(InterestErrorCode.INTEREST_ALREADY_EXISTS, Map.of("name", name));
+    }
+
+    checkOptimizedSimilarity(name);
+
+    Interest interest = Interest.create(name, request.keywords());
+    interest = interestRepository.save(interest);
+    log.info("관심사 등록 완료 - interestId: {}, name: {}", interest.getId(), name);
+
+    return InterestDto.from(interest);
+  }
+
+  @Transactional
+  public InterestDto updateInterest(UUID interestId, InterestUpdateRequest request) {
+    log.debug("관심사 수정 시작 - 입력값: {}, {}", interestId, request);
+    Interest interest = interestRepository.findById(interestId)
+        .orElseThrow(() -> new InterestException(InterestErrorCode.INTEREST_NOT_FOUND,
+            Map.of("interestId", interestId)));
+
+    interest.updateKeywords(request.keywords());
+
+    log.info("관심사 수정 완료 - interestId: {}, name: {}", interestId, interest.getName());
+
+    return InterestDto.from(interest);
+  }
+
+  @Transactional
+  public void deleteInterest(UUID interestId) {
+    log.debug("관심사 삭제 시작 - 입력값: {}", interestId);
+    if(!interestRepository.existsById(interestId)) {
+      throw new InterestException(InterestErrorCode.INTEREST_NOT_FOUND, Map.of("interestId", interestId));
+    }
+
+    subscriptionRepository.deleteByInterestId(interestId);
+    articleInterestRepository.deleteByInterestId(interestId);
+    interestRepository.deleteById(interestId);
+    log.info("관심사 삭제 완료 - interestId: {}", interestId);
+  }
+
+  @Transactional(readOnly = true)
+  public CursorPageResponse<InterestDto> searchInterest(UUID userId,
+      InterestSearchRequest request) {
+    log.debug("관심사 목록 조회 시작 - 요청 조건: {}", request);
+    if (!userRepository.existsById(userId)) {
+      throw new UserException(UserErrorCode.INVALID_CREDENTIALS, Map.of("userId", userId));
+    }
+
+    List<Interest> interestList = interestRepository.findAllByCondition(request);
+
+    boolean hasNext = false;
+    if (interestList.size() > request.getLimit()) {
+      hasNext = true;
+      interestList = interestList.subList(0, request.getLimit());
+    }
+
+    if (interestList.isEmpty()) {
+      return new CursorPageResponse<>(List.of(), null, null, request.getLimit(), 0L, false);
+    }
+
+    List<UUID> interestIds = interestList.stream()
+        .map(Interest::getId)
+        .toList();
+
+    Set<UUID> subscribedInterestIds = subscriptionRepository.findSubscribedInterestIds(userId,
+        interestIds);
+
+    List<InterestDto> content = interestList.stream()
+        .map(interest -> {
+          boolean subscribedByMe = subscribedInterestIds.contains(interest.getId());
+          return InterestDto.of(interest, subscribedByMe);
+        })
+        .toList();
+
+    Interest lastInterest = interestList.get(interestList.size() - 1);
+
+    String nextCursor = request.getOrderBy().equals("subscriberCount")
+        ? lastInterest.getSubscriberCount() + "_" +lastInterest.getId()
+        : lastInterest.getName();
+
+    String nextAfter = hasNext ? lastInterest.getCreatedAt().format(CURSOR_DATE_FORMATTER) : null;
+
+    log.debug("관심사 목록 조회 완료 - 응답 사이즈: {}, hasNext: {}", content.size(), hasNext);
+
+    return new CursorPageResponse<InterestDto>(
+        content,
+        hasNext ? nextCursor : null,
+        nextAfter,
+        request.getLimit(),
+        0L,
+        hasNext
+    );
+  }
+
+  // Levenshtein 알고리즘을 활용한 유사도 검증 헬퍼 메서드
+  private void checkOptimizedSimilarity(String newName) {
+    int len = newName.length();
+    double threshold = 0.8;
+
+    // 80% 유사도를 만족할 수 있는 길이 동적 계산 로직 적용
+    int calculatedMin = (int) Math.ceil(len * threshold);
+    int calculatedMax = (int) Math.floor(len / threshold);
+
+    int minLength = Math.max(1, calculatedMin - 1);
+    int maxLength = Math.min(20, calculatedMax + 1);
+
+    List<Interest> candidates = interestRepository.findSimilarLengthInterests(minLength, maxLength);
+
+    if (candidates.isEmpty()) return;
+
+    // 새 단어를 자모 분해 처리
+    String decomposedNewName = Normalizer.normalize(newName, Form.NFD);
+
+    for (Interest existing : candidates) {
+      String existingName = existing.getName();
+
+      // 기존 단어도 자모 분해 처리
+      String decomposedExistingName = Normalizer.normalize(existingName, Form.NFD);
+
+      // 쪼개진 모음/자음 상태로 거리 계산
+      int distance = LEVENSHTEIN_DISTANCE.apply(decomposedNewName, decomposedExistingName);
+      int maxLen = Math.max(decomposedNewName.length(), decomposedExistingName.length());
+
+      double similarity = 1.0 - ((double) distance / maxLen);
+
+      if (similarity >= threshold) {
+        log.warn("유사도 충돌 - 요청: {}, 기존: {}, 임계값: {}, 유사도: {}", newName, existingName, threshold,
+            similarity);
+        throw new InterestException(InterestErrorCode.SIMILAR_INTEREST_EXISTS, Map.of(
+            "requestedName", newName,
+            "similarName", existingName,
+            "threshold", threshold,
+            "similarity", Math.round(similarity * 100) + "%"
+        ));
+      }
+    }
+  }
+}

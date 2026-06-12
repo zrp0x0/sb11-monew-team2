@@ -1,22 +1,23 @@
 package com.codeit.monew.domain.user.entity;
 
-import static com.codeit.monew.global.entity.BaseSoftDeleteEntity.*;
-
 import com.codeit.monew.global.entity.BaseSoftDeleteEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import java.util.UUID;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.util.UUID;
+
+import static com.codeit.monew.global.entity.BaseSoftDeleteEntity.IS_DELETED_FALSE;
+
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_users_email", columnNames = "email")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLRestriction(IS_DELETED_FALSE)
@@ -26,22 +27,26 @@ public class User extends BaseSoftDeleteEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 254)
     private String email;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String nickname;
 
-    @Column(nullable = false)
-    private String password;
+    @Column(name = "password_hash", nullable = false, length = 60)
+    private String passwordHash;
 
-    public User(String email, String nickname, String password) {
+    private User(String email, String nickname, String passwordHash) {
         this.email = email;
         this.nickname = nickname;
-        this.password = password;
+        this.passwordHash = passwordHash;
     }
 
-    public static User createUser(String email, String nickname, String password) {
-        return new User(email, nickname, password);
+    public static User create(String email, String nickname, String passwordHash) {
+        return new User(email, nickname, passwordHash);
+    }
+
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
     }
 }
