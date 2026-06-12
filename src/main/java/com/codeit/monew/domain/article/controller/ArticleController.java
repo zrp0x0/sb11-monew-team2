@@ -8,7 +8,6 @@ import com.codeit.monew.domain.article.service.ArticleService;
 import com.codeit.monew.domain.articleView.dto.response.ArticleViewDto;
 import com.codeit.monew.global.dto.CursorPageResponse;
 import com.codeit.monew.domain.article.entity.ArticleSource;
-import org.springframework.web.bind.annotation.RequestParam;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -17,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,7 +48,7 @@ public class ArticleController {
   public CursorPageResponse<ArticleDto> searchArticles(
           @Valid @ModelAttribute ArticleSearchRequest request,
           @RequestParam(value = "sourceIn[]", required = false) List<ArticleSource> sourceInBrackets,
-          @RequestHeader(HEADER_USER_ID) UUID requestUserId
+          @RequestHeader(value = HEADER_USER_ID, required = false) String requestUserId
   ) {
     ArticleSearchRequest normalizedRequest = articleSearchRequestNormalizer.normalize(
             request,
