@@ -21,4 +21,9 @@ public abstract class BaseTimeEntity {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    // 복구를 위한 전용 메서드 (protected로 같은 도메인 패키지 내 엔티티만 접근 가능)
+    protected void setCreatedAtForRestore(LocalDateTime createdAt) {
+      this.createdAt = createdAt;
+    }
 }

@@ -28,7 +28,7 @@ public interface ArticleRepository extends JpaRepository<Article, UUID>, Article
   @Modifying(clearAutomatically = true)
   @Query(value = """
       INSERT INTO articles (id, source, source_url, title, summary, published_at, view_count, comment_count, is_deleted, created_at, updated_at)
-      VALUES (:#{#a.id}, :#{#a.source.name()}, :#{#a.sourceUrl}, :#{#a.title}, :#{#a.summary}, :#{#a.publishedAt}, :#{#a.viewCount}, :#{#a.commentCount}, false, :#{#a.publishedAt}, now())
+      VALUES (:#{#a.id}, :#{#a.source.name()}, :#{#a.sourceUrl}, :#{#a.title}, :#{#a.summary}, :#{#a.publishedAt}, :#{#a.viewCount}, :#{#a.commentCount}, false, :#{#a.createdAt}, now())
       ON CONFLICT (source_url) DO NOTHING
       """, nativeQuery = true)
   int upsertArticleSkipDuplicate(@Param("a") Article article);

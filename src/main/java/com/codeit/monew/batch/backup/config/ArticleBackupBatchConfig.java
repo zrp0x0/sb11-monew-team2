@@ -80,7 +80,7 @@ public class ArticleBackupBatchConfig {
         .name("articleJpaReader")
         .entityManagerFactory(entityManagerFactory)
         .queryString(
-            "SELECT a FROM Article a WHERE FUNCTION('DATE', a.publishedAt) = CAST(:targetDate AS date) ORDER BY a.id ASC")
+            "SELECT a FROM Article a WHERE FUNCTION('DATE', a.createdAt) = CAST(:targetDate AS date) ORDER BY a.id ASC")
         .parameterValues(Map.of("targetDate", targetDate))
         .pageSize(chunkSize)
         .build();
@@ -98,6 +98,7 @@ public class ArticleBackupBatchConfig {
           article.getSummary(),
           article.getSourceUrl(),
           article.getPublishedAt(),
+          article.getCreatedAt(),
           interestIds
       );
     };

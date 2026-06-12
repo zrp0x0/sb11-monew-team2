@@ -10,6 +10,7 @@ import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.entity.ArticleSource;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
 import java.io.File;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,7 +96,7 @@ public class ArticleBackupBatchConfigTest {
   @DisplayName("청크(Chunk) 테스트 - 8건의 데이터가 청크 사이즈(3)에 맞춰 3번의 쓰기 작업으로 나뉘어 처리된다.")
   void articleBackupJob_ChunkTest() throws Exception {
     //given
-    String targetDate = "2026-01-01";
+    String targetDate = LocalDate.now().toString();
     LocalDateTime publishDate = LocalDateTime.of(2026, 1, 1, 10, 0);
 
     for (int i = 0; i < 8; i++) {

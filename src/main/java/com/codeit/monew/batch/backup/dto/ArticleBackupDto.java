@@ -12,6 +12,7 @@ public record ArticleBackupDto(
     String summary,
     String sourceUrl,
     LocalDateTime publishDate,
+    LocalDateTime createdAt,
     List<UUID> interestIds
 ) {
 
