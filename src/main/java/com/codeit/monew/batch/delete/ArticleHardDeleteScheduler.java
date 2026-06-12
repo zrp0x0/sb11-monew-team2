@@ -23,7 +23,7 @@ public class ArticleHardDeleteScheduler {
      */
     @Scheduled(cron = "0 0 0 * * *")
     public void executeDailyArticleCleanup() {
-        LocalDateTime cutoffDate = LocalDateTime.now().minusMonths(1);
+        LocalDateTime cutoffDate = LocalDateTime.now().minusMonths(0);
         int totalDeleted = 0;
 
         log.info("Starting looping hard delete for articles created before: {}", cutoffDate);
