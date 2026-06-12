@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -47,6 +48,7 @@ public record ArticleSearchRequest(
     @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
     LocalDateTime after,
 
+    @NotNull(message = "페이지 크기는 필수입니다.")
     @Positive(message = "페이지 크기는 1 이상이어야 합니다.")
     @Max(value = 100, message = "페이지 크기는 최대 100까지 가능합니다.")
     @Schema(description = "커서 페이지 크기", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
