@@ -6,15 +6,21 @@ import com.codeit.monew.batch.backup.dto.ArticleBackupDto;
 import com.codeit.monew.domain.article.entity.Article;
 import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.codeit.monew.domain.article.repository.ArticleRepository;
+import com.codeit.monew.domain.interest.entity.Interest;
+import com.codeit.monew.domain.interest.repository.InterestRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -46,6 +52,7 @@ public class ArticleRestoreBatchConfig {
 
   private final ArticleRepository articleRepository;
   private final ArticleInterestRepository articleInterestRepository;
+  private final InterestRepository interestRepository;
   private final AmazonS3 amazonS3;
 
   @Value("${batch.chunk-size:500}")
@@ -70,7 +77,8 @@ public class ArticleRestoreBatchConfig {
   public Step downloadFromS3Step(JobRepository jobRepository, PlatformTransactionManager ptm) {
     return new StepBuilder("downloadFromS3Step", jobRepository)
         .tasklet((contribution, chunkContext) -> {
-          String targetDate = chunkContext.getStepContext().getJobParameters().get("targetDate").toString();
+          String targetDate = chunkContext.getStepContext().getJobParameters().get("targetDate")
+              .toString();
           String s3Key = "article/" + targetDate + ".json";
           String tempPath = getTempFilePath(targetDate);
 
@@ -123,7 +131,7 @@ public class ArticleRestoreBatchConfig {
               File localTempFile = new File(tempPath);
               if (localTempFile.exists()) {
                 boolean deleted = localTempFile.delete();
-                log.info("[{}] 로컬 임시 파일 삭제 {}: {}", targetDate, deleted ? "성공" : "실패", tempPath);              }
+                log.info("[{}] 로컬 임시 파일 삭제 {}: {}", targetDate, deleted ? "성공" : "실패", tempPath);}
             }
 
             return StepExecutionListener.super.afterStep(stepExecution);
@@ -162,14 +170,28 @@ public class ArticleRestoreBatchConfig {
   @Bean
   @StepScope
   public ItemWriter<ArticleBackupDto> articleDbWriter(
-      @Value("#{stepExecution}") StepExecution stepExecution
-  ) {
+      @Value("#{stepExecution}") StepExecution stepExecution) {
     return dtos -> {
       var jobContext = stepExecution.getJobExecution().getExecutionContext();
+      String targetDate = stepExecution.getJobParameters().getString("targetDate");
 
       List<String> restoredIds = Optional.ofNullable(
               (List<String>) jobContext.get("RESTORED_ARTICLE_IDS"))
           .orElse(new ArrayList<>());
+
+      // 현재 청크에 존재하는 모든 관심사 ID 수집
+      Set<UUID> allInterestIdsInChunk = dtos.getItems().stream()
+          .filter(dto -> dto.interestIds() != null)
+          .flatMap(dto -> dto.interestIds().stream())
+          .collect(Collectors.toSet());
+
+      // 수집된 ID 중 실제 DB에 살아있는 관심사 ID만 딱 1번의 쿼리로 미리 가져옴
+      Set<UUID> aliveInterestIds = new HashSet<>();
+      if (!allInterestIdsInChunk.isEmpty()) {
+        aliveInterestIds = interestRepository.findAllById(allInterestIdsInChunk).stream()
+            .map(Interest::getId)
+            .collect(Collectors.toSet());
+      }
 
       // 통계(로그) 용 변수 세팅
       int chunkTotalDtoCount = dtos.size(); // S3에서 읽어온 DTO 개수
@@ -178,35 +200,53 @@ public class ArticleRestoreBatchConfig {
       int chunkSkippedArticleCount = 0;     // 이미 DB에 있어서 무시된 기사 개수
 
       for (ArticleBackupDto dto : dtos) {
+
+        // createdAt이 null이라면, 차선책으로 publishDate를 생성일로 간주
+        LocalDateTime safeCreatedAt = dto.createdAt() != null ? dto.createdAt() : dto.publishDate();
+
         // 기사 엔티티 생성
         Article article = Article.restore(
-            dto.id(), dto.source(), dto.sourceUrl(), dto.title(), dto.summary(), dto.publishDate()
+            dto.id(), dto.source(), dto.sourceUrl(), dto.title(), dto.summary(), dto.publishDate(), safeCreatedAt
         );
 
         // 기사 본체 복구 (articles 테이블)
         int updatedRows = articleRepository.upsertArticleSkipDuplicate(article);
 
-        // 기사가 새롭게 INSERT 되었다면 매핑도 진행 (중복 Skip 된 경우는 매핑도 Skip)
+        // 기사 본체 복구 완료 후 통계 처리
         if (updatedRows > 0) {
           restoredIds.add(article.getId().toString());
           chunkInsertedArticleCount++; // 기사 복구 성공 +1
-
-          // 관심사 매핑 복구 (article_interests 테이블)
-          if (dto.interestIds() != null && !dto.interestIds().isEmpty()) {
-            for (UUID interestId : dto.interestIds()) {
-              // 새로 발급한 랜덤 UUID를 식별자로 사용
-              articleInterestRepository.insertIgnoreMapping(UUID.randomUUID(), article.getId(),
-                  interestId);
-              chunkInsertedMappingCount++; // 매핑 복구 성공 +1
-            }
-          }
         } else {
           chunkSkippedArticleCount++; // 이미 존재하는 기사 스킵 +1
+        }
+
+        // 관심사 매핑 복구 (article_interests 테이블)
+        // 기사 본체의 신규/중복 여부와 상관없이 매핑 복구는 무조건 시도
+        if (dto.interestIds() != null && !dto.interestIds().isEmpty()) {
+          for (UUID interestId : dto.interestIds()) {
+
+            // DB에 관심사가 없으면 쿼리를 날리지 않고 스킵
+            if (!aliveInterestIds.contains(interestId)) {
+              log.info("[{}] 삭제된 관심사 무시 (쿼리 패스) - 기사ID: {}, 무시된 관심사ID: {}", targetDate, article.getId(), interestId);
+              continue;
+            }
+
+            // 새로운 매핑이 정상적으로 DB에 INSERT 된 경우 1, 매핑이 실패하여 무시된 경우 0을 반환
+            int inserted = articleInterestRepository.insertIgnoreMapping(UUID.randomUUID(),
+                article.getId(), interestId);
+
+            if (inserted > 0) {
+              chunkInsertedMappingCount++; // 매핑 복구 성공 +1
+            } else {
+              // 관심사가 살아있지만 이미 동일한 매핑이 존재할 경우
+              log.debug("[{}] 중복된 매핑 스킵 - 기사ID: {}, 관심사ID: {}", targetDate, article.getId(), interestId);
+            }
+          }
         }
       }
       jobContext.put("RESTORED_ARTICLE_IDS", restoredIds);
 
-      log.info("========== [기사 복구 청크 요약] ==========");
+      log.info("========== [{}] 기사 복구 청크 요약 ==========", targetDate);
       log.info("읽어온 데이터: 총 {} 건", chunkTotalDtoCount);
       log.info("기사 복구 성공: {} 건 (articles 테이블)", chunkInsertedArticleCount);
       log.info("매핑 복구 성공: {} 건 (article_interests 테이블)", chunkInsertedMappingCount);
