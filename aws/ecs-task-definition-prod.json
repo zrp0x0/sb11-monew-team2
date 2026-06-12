@@ -45,23 +45,23 @@
       "secrets": [
         {
           "name": "SPRING_DATASOURCE_URL",
-          "valueFrom": "__PROD_DATASOURCE_URL_SECRET_ARN__"
+          "valueFrom": "__PROD_DATASOURCE_URL_SECRET_ARN__:SPRING_DATASOURCE_URL::"
         },
         {
           "name": "SPRING_DATASOURCE_USERNAME",
-          "valueFrom": "__PROD_DATASOURCE_USERNAME_SECRET_ARN__"
+          "valueFrom": "__PROD_DATASOURCE_USERNAME_SECRET_ARN__:SPRING_DATASOURCE_USERNAME::"
         },
         {
           "name": "SPRING_DATASOURCE_PASSWORD",
-          "valueFrom": "__PROD_DATASOURCE_PASSWORD_SECRET_ARN__"
+          "valueFrom": "__PROD_DATASOURCE_PASSWORD_SECRET_ARN__:SPRING_DATASOURCE_PASSWORD::"
         },
         {
           "name": "NAVER_CLIENT_ID",
-          "valueFrom": "__PROD_NAVER_CLIENT_ID_SECRET_ARN__"
+          "valueFrom": "__PROD_NAVER_CLIENT_ID_SECRET_ARN__:NAVER_CLIENT_ID::"
         },
         {
           "name": "NAVER_CLIENT_SECRET",
-          "valueFrom": "__PROD_NAVER_CLIENT_SECRET_SECRET_ARN__"
+          "valueFrom": "__PROD_NAVER_CLIENT_SECRET_SECRET_ARN__:NAVER_CLIENT_SECRET::"
         }
       ],
       "logConfiguration": {
