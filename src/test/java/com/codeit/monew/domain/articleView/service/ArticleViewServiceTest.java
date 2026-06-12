@@ -250,4 +250,101 @@ class ArticleViewServiceTest {
         ReflectionTestUtils.setField(articleView, "createdAt", createdAt);
         return articleView;
     }
+
+    @Test
+    @DisplayName("기사 뷰 등록 시 처음 조회한 기사라면 ArticleView를 저장하고 조회 수를 증가시킨다")
+    void registerArticleView_firstView_savesArticleViewAndIncreaseViewCount() {
+        // given
+        UUID articleId = UUID.randomUUID();
+        UUID requestUserId = UUID.randomUUID();
+
+        User user = User.create("viewer@example.com", "viewer", "password-hash");
+        ReflectionTestUtils.setField(user, "id", requestUserId);
+
+        Article article = Article.create(
+                ArticleSource.NAVER,
+                "https://news.naver.com/first-view",
+                "처음 조회한 기사",
+                "처음 조회한 기사 요약",
+                LocalDateTime.of(2026, 5, 27, 10, 30)
+        );
+        ReflectionTestUtils.setField(article, "id", articleId);
+
+        ArticleView savedArticleView = ArticleView.create(user, article);
+        ReflectionTestUtils.setField(savedArticleView, "id", UUID.randomUUID());
+
+        when(userRepository.findById(requestUserId))
+                .thenReturn(Optional.of(user));
+        when(articleRepository.findById(articleId))
+                .thenReturn(Optional.of(article));
+        when(articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId))
+                .thenReturn(Optional.empty());
+        when(articleViewRepository.save(any(ArticleView.class)))
+                .thenReturn(savedArticleView);
+
+        // when
+        ArticleViewDto response = articleService.registerArticleView(
+                articleId,
+                requestUserId.toString()
+        );
+
+        // then
+        assertThat(response.articleId()).isEqualTo(articleId);
+        assertThat(response.viewedBy()).isEqualTo(requestUserId);
+        assertThat(article.getViewCount()).isEqualTo(1L);
+
+        verify(userRepository).findById(requestUserId);
+        verify(articleRepository).findById(articleId);
+        verify(articleViewRepository).findByUserIdAndArticleId(requestUserId, articleId);
+        verify(articleViewRepository).save(any(ArticleView.class));
+    }
+
+    @Test
+    @DisplayName("기사 뷰 등록 시 이미 조회한 기사라면 기존 ArticleView를 반환하고 조회 수를 증가시키지 않는다")
+    void registerArticleView_alreadyViewed_returnsExistingArticleViewWithoutIncreasingViewCount() {
+        // given
+        UUID articleId = UUID.randomUUID();
+        UUID requestUserId = UUID.randomUUID();
+
+        User user = User.create("viewer@example.com", "viewer", "password-hash");
+        ReflectionTestUtils.setField(user, "id", requestUserId);
+
+        Article article = Article.create(
+                ArticleSource.NAVER,
+                "https://news.naver.com/already-viewed",
+                "이미 조회한 기사",
+                "이미 조회한 기사 요약",
+                LocalDateTime.of(2026, 5, 27, 10, 30)
+        );
+        ReflectionTestUtils.setField(article, "id", articleId);
+        ReflectionTestUtils.setField(article, "viewCount", 1L);
+
+        ArticleView existingArticleView = ArticleView.create(user, article);
+        ReflectionTestUtils.setField(existingArticleView, "id", UUID.randomUUID());
+
+        when(userRepository.findById(requestUserId))
+                .thenReturn(Optional.of(user));
+        when(articleRepository.findById(articleId))
+                .thenReturn(Optional.of(article));
+        when(articleViewRepository.findByUserIdAndArticleId(requestUserId, articleId))
+                .thenReturn(Optional.of(existingArticleView));
+
+        // when
+        ArticleViewDto response = articleService.registerArticleView(
+                articleId,
+                requestUserId.toString()
+        );
+
+        // then
+        assertThat(response.articleId()).isEqualTo(articleId);
+        assertThat(response.viewedBy()).isEqualTo(requestUserId);
+        assertThat(article.getViewCount()).isEqualTo(1L);
+
+        verify(userRepository).findById(requestUserId);
+        verify(articleRepository).findById(articleId);
+        verify(articleViewRepository).findByUserIdAndArticleId(requestUserId, articleId);
+
+        // 이미 조회한 기사라면 새 ArticleView를 저장하지 않아야 한다.
+        verify(articleViewRepository, never()).save(any(ArticleView.class));
+    }
 }
