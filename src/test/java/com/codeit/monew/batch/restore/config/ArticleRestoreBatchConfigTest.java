@@ -83,9 +83,9 @@ public class ArticleRestoreBatchConfigTest {
     // S3에서 내려받은 것처럼 꾸밀 가짜 JSON 문자열 생성 (기존 기사 1, 유실된 기사 2)
     String mockJsonData = """
         [
-          {"id":"%s", "source":"NAVER", "title":"기존 기사", "summary":"요약", "sourceUrl":"http://test.com/existing", "publishDate":"2026-01-01T10:00:00"},
-          {"id":"%s", "source":"NAVER", "title":"유실된 기사 1", "summary":"요약 1", "sourceUrl":"http://test.com/lost1", "publishDate":"2026-01-01T11:00:00"},
-          {"id":"%s", "source":"NAVER", "title":"유실된 기사 2", "summary":"요약 2", "sourceUrl":"http://test.com/lost2", "publishDate":"2026-01-01T12:00:00"}
+          {"id":"%s", "source":"NAVER", "title":"기존 기사", "summary":"요약", "sourceUrl":"http://test.com/existing", "publishDate":"2026-01-01T10:00:00", "createdAt":"2026-01-01T11:00:00", "interestIds":[]},
+          {"id":"%s", "source":"NAVER", "title":"유실된 기사 1", "summary":"요약 1", "sourceUrl":"http://test.com/lost1", "publishDate":"2026-01-01T11:00:00", "createdAt":"2026-01-01T11:00:00", "interestIds":[]},
+          {"id":"%s", "source":"NAVER", "title":"유실된 기사 2", "summary":"요약 2", "sourceUrl":"http://test.com/lost2", "publishDate":"2026-01-01T12:00:00", "createdAt":"2026-01-01T12:00:00", "interestIds":[]}
         ]
         """.formatted(existingArticle.getId().toString(), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
@@ -135,7 +135,7 @@ public class ArticleRestoreBatchConfigTest {
     jsonBuilder.append("[\n");
     for (int i = 1; i <= 8; i++) {
       jsonBuilder.append(String.format(
-          "{\"id\":\"%s\", \"source\":\"NAVER\", \"title\":\"청크 복구 기사 %d\", \"summary\":\"요약 %d\", \"sourceUrl\":\"http://test.com/chunk-restore%d\", \"publishDate\":\"2026-01-01T10:00:00\"}",
+          "{\"id\":\"%s\", \"source\":\"NAVER\", \"title\":\"청크 복구 기사 %d\", \"summary\":\"요약 %d\", \"sourceUrl\":\"http://test.com/chunk-restore%d\", \"publishDate\":\"2026-01-01T10:00:00\", \"createdAt\":\"2026-01-01T10:00:00\", \"interestIds\":[]}",
           UUID.randomUUID(), i, i, i
       ));
       if (i < 8) {

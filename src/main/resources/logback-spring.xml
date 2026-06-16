@@ -61,12 +61,10 @@
   <springProfile name="prod">
     <root>
       <appender-ref ref="CONSOLE"/>
-      <appender-ref ref="FILE"/>
-    </root>
+      </root>
     <logger name="com.codeit.monew" additivity="false">
       <appender-ref ref="CONSOLE"/>
-      <appender-ref ref="FILE"/>
-    </logger>
+      </logger>
   </springProfile>
 
 </configuration>

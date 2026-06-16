@@ -59,11 +59,11 @@ class ArticleRepositoryTest {
     em.clear();
 
     Article duplicateArticle = Article.restore(
-        UUID.randomUUID(), ArticleSource.NAVER, targetUrl, "중복 기사", "요약", LocalDateTime.now());
+        UUID.randomUUID(), ArticleSource.NAVER, targetUrl, "중복 기사", "요약", LocalDateTime.now(), LocalDateTime.now());
 
     Article newArticle = Article.restore(
         UUID.randomUUID(), ArticleSource.NAVER, "http://new-url.com", "새 기사", "요약",
-        LocalDateTime.now());
+        LocalDateTime.now(), LocalDateTime.now());
 
     // when
     int duplicateResult = articleRepository.upsertArticleSkipDuplicate(duplicateArticle);

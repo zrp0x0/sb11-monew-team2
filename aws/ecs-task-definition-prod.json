@@ -1,0 +1,77 @@
+{
+  "family": "__ECS_TASK_FAMILY__",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "__ECS_TASK_EXECUTION_ROLE_ARN__",
+  "taskRoleArn": "__ECS_TASK_ROLE_ARN__",
+  "containerDefinitions": [
+    {
+      "name": "__ECS_CONTAINER_NAME__",
+      "image": "monew-api:production",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "prod"
+        },
+        {
+          "name": "SERVER_PORT",
+          "value": "8080"
+        },
+        {
+          "name": "SPRING_BATCH_JOB_ENABLED",
+          "value": "false"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "__AWS_REGION__"
+        },
+        {
+          "name": "AWS_S3_BUCKET_NAME",
+          "value": "__AWS_S3_BUCKET_NAME__"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "SPRING_DATASOURCE_URL",
+          "valueFrom": "__PROD_DATASOURCE_URL_SECRET_ARN__:SPRING_DATASOURCE_URL::"
+        },
+        {
+          "name": "SPRING_DATASOURCE_USERNAME",
+          "valueFrom": "__PROD_DATASOURCE_USERNAME_SECRET_ARN__:SPRING_DATASOURCE_USERNAME::"
+        },
+        {
+          "name": "SPRING_DATASOURCE_PASSWORD",
+          "valueFrom": "__PROD_DATASOURCE_PASSWORD_SECRET_ARN__:SPRING_DATASOURCE_PASSWORD::"
+        },
+        {
+          "name": "NAVER_CLIENT_ID",
+          "valueFrom": "__PROD_NAVER_CLIENT_ID_SECRET_ARN__:NAVER_CLIENT_ID::"
+        },
+        {
+          "name": "NAVER_CLIENT_SECRET",
+          "valueFrom": "__PROD_NAVER_CLIENT_SECRET_SECRET_ARN__:NAVER_CLIENT_SECRET::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "__CLOUDWATCH_LOG_GROUP__",
+          "awslogs-region": "__AWS_REGION__",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

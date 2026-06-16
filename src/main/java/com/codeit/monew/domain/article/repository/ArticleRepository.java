@@ -22,17 +22,15 @@ public interface ArticleRepository extends JpaRepository<Article, UUID>, Article
           SELECT EXISTS (
                SELECT 1
                FROM articles
-               WHERE source_url = :sourceUrl                                          
-          )
-          """,
-      nativeQuery = true
+               WHERE source_url = :sourceUrl)
+          """, nativeQuery = true
   )
   boolean existsBySourceUrlIncludingDeleted(@Param("sourceUrl") String sourceUrl);
 
   @Modifying(clearAutomatically = true)
   @Query(value = """
-      INSERT INTO articles (id, source, source_url, title, summary, published_at, view_count, comment_count, is_deleted, created_at, updated_at) 
-      VALUES (:#{#a.id}, :#{#a.source.name()}, :#{#a.sourceUrl}, :#{#a.title}, :#{#a.summary}, :#{#a.publishedAt}, :#{#a.viewCount}, :#{#a.commentCount}, false, now(), now()) 
+      INSERT INTO articles (id, source, source_url, title, summary, published_at, view_count, comment_count, is_deleted, created_at, updated_at)
+      VALUES (:#{#a.id}, :#{#a.source.name()}, :#{#a.sourceUrl}, :#{#a.title}, :#{#a.summary}, :#{#a.publishedAt}, :#{#a.viewCount}, :#{#a.commentCount}, false, :#{#a.createdAt}, now())
       ON CONFLICT (source_url) DO NOTHING
       """, nativeQuery = true)
   int upsertArticleSkipDuplicate(@Param("a") Article article);

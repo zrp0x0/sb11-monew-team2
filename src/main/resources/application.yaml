@@ -17,6 +17,9 @@ scheduling:
   pool-size: 4
   thread-name-prefix: monew-scheduler-
 
+batch:
+  chunk-size: 1000
+
 logging:
   level:
     org.hibernate.SQL: debug

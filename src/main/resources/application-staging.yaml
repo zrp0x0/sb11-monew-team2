@@ -14,8 +14,13 @@ spring:
         format_sql: false
         default_batch_fetch_size: 100
   batch:
+    jdbc:
+      initialize-schema: never
     job:
       enabled: false
+
+batch:
+  chunk-size: 1000
 
 external-api:
   naver:

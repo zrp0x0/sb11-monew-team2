@@ -1,0 +1,197 @@
+name: CD Production ECS
+
+on:
+  workflow_run:
+    workflows: [ "CI Pipeline" ]
+    types: [ completed ]
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "ECR image tag to build and deploy"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
+      AWS_ROLE_TO_ASSUME: ${{ vars.AWS_ROLE_TO_ASSUME }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'monew-api' }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER || 'monew-prod' }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE || 'monew-api-prod' }}
+      ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY || 'monew-api-prod' }}
+      ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME || 'monew-api' }}
+      ECS_TASK_EXECUTION_ROLE_ARN: ${{ vars.ECS_TASK_EXECUTION_ROLE_ARN }}
+      ECS_TASK_ROLE_ARN: ${{ vars.ECS_TASK_ROLE_ARN }}
+      CLOUDWATCH_LOG_GROUP: ${{ vars.CLOUDWATCH_LOG_GROUP || '/ecs/monew-api-prod' }}
+      AWS_S3_BUCKET_NAME: ${{ vars.AWS_S3_BUCKET_NAME }}
+      PROD_DATASOURCE_URL_SECRET_ARN: ${{ vars.PROD_DATASOURCE_URL_SECRET_ARN }}
+      PROD_DATASOURCE_USERNAME_SECRET_ARN: ${{ vars.PROD_DATASOURCE_USERNAME_SECRET_ARN }}
+      PROD_DATASOURCE_PASSWORD_SECRET_ARN: ${{ vars.PROD_DATASOURCE_PASSWORD_SECRET_ARN }}
+      PROD_NAVER_CLIENT_ID_SECRET_ARN: ${{ vars.PROD_NAVER_CLIENT_ID_SECRET_ARN }}
+      PROD_NAVER_CLIENT_SECRET_SECRET_ARN: ${{ vars.PROD_NAVER_CLIENT_SECRET_SECRET_ARN }}
+      PROD_HEALTHCHECK_URL: ${{ vars.PROD_HEALTHCHECK_URL }}
+
+    steps:
+      - name: 1. 배포 대상 코드 가져오기
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: 2. Production 배포 변수 확인하기
+        run: |
+          set -euo pipefail
+
+          REQUIRED_VARS=(
+            AWS_ROLE_TO_ASSUME
+            AWS_REGION
+            ECR_REPOSITORY
+            ECS_CLUSTER
+            ECS_SERVICE
+            ECS_TASK_FAMILY
+            ECS_CONTAINER_NAME
+            ECS_TASK_EXECUTION_ROLE_ARN
+            ECS_TASK_ROLE_ARN
+            CLOUDWATCH_LOG_GROUP
+            AWS_S3_BUCKET_NAME
+            PROD_DATASOURCE_URL_SECRET_ARN
+            PROD_DATASOURCE_USERNAME_SECRET_ARN
+            PROD_DATASOURCE_PASSWORD_SECRET_ARN
+            PROD_NAVER_CLIENT_ID_SECRET_ARN
+            PROD_NAVER_CLIENT_SECRET_SECRET_ARN
+          )
+
+          for name in "${REQUIRED_VARS[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "::error::GitHub production Environment Variable '${name}' 값이 필요합니다."
+              exit 1
+            fi
+          done
+
+      - name: 3. 배포 image tag 결정하기
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
+            IMAGE_TAG="${{ inputs.image_tag }}"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            IMAGE_TAG="main-${{ github.event.workflow_run.head_sha }}"
+          else
+            IMAGE_TAG="main-${GITHUB_SHA}"
+          fi
+
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "Production image tag: ${IMAGE_TAG}"
+
+      - name: 4. AWS 인증 설정하기
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 5. AWS 인증 대상 확인하기
+        run: aws sts get-caller-identity
+
+      - name: 6. Amazon ECR 로그인하기
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 7. Docker image 빌드 및 ECR 업로드하기
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          set -euo pipefail
+
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          PRODUCTION_IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:production"
+
+          docker build \
+            --tag "${IMAGE_URI}" \
+            --tag "${PRODUCTION_IMAGE_URI}" \
+            .
+
+          docker push "${IMAGE_URI}"
+          docker push "${PRODUCTION_IMAGE_URI}"
+
+          echo "IMAGE_URI=${IMAGE_URI}" >> "$GITHUB_ENV"
+          echo "Pushed production image: ${IMAGE_URI}"
+
+      - name: 8. ECS task definition 변수 반영하기
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          template_path = Path("aws/ecs-task-definition-prod.json")
+          output_path = Path("aws/ecs-task-definition-prod.rendered.json")
+
+          content = template_path.read_text(encoding="utf-8")
+          replacements = {
+              "AWS_REGION": os.environ["AWS_REGION"].strip(),
+              "AWS_S3_BUCKET_NAME": os.environ["AWS_S3_BUCKET_NAME"].strip(),
+              "ECS_TASK_FAMILY": os.environ["ECS_TASK_FAMILY"].strip(),
+              "ECS_CONTAINER_NAME": os.environ["ECS_CONTAINER_NAME"].strip(),
+              "ECS_TASK_EXECUTION_ROLE_ARN": os.environ["ECS_TASK_EXECUTION_ROLE_ARN"].strip(),
+              "ECS_TASK_ROLE_ARN": os.environ["ECS_TASK_ROLE_ARN"].strip(),
+              "CLOUDWATCH_LOG_GROUP": os.environ["CLOUDWATCH_LOG_GROUP"].strip(),
+              "PROD_DATASOURCE_URL_SECRET_ARN": os.environ["PROD_DATASOURCE_URL_SECRET_ARN"].strip(),
+              "PROD_DATASOURCE_USERNAME_SECRET_ARN": os.environ["PROD_DATASOURCE_USERNAME_SECRET_ARN"].strip(),
+              "PROD_DATASOURCE_PASSWORD_SECRET_ARN": os.environ["PROD_DATASOURCE_PASSWORD_SECRET_ARN"].strip(),
+              "PROD_NAVER_CLIENT_ID_SECRET_ARN": os.environ["PROD_NAVER_CLIENT_ID_SECRET_ARN"].strip(),
+              "PROD_NAVER_CLIENT_SECRET_SECRET_ARN": os.environ["PROD_NAVER_CLIENT_SECRET_SECRET_ARN"].strip(),
+          }
+
+          for key, value in replacements.items():
+              content = content.replace(f"__{key}__", value)
+
+          output_path.write_text(content, encoding="utf-8")
+          PY
+
+      - name: 9. ECS task definition image 반영하기
+        id: render-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: aws/ecs-task-definition-prod.rendered.json
+          container-name: ${{ env.ECS_CONTAINER_NAME }}
+          image: ${{ env.IMAGE_URI }}
+
+      - name: 10. ECS service에 배포하기
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: 11. Production 헬스 체크하기
+        if: env.PROD_HEALTHCHECK_URL != ''
+        run: |
+          set -euo pipefail
+
+          for i in {1..30}; do
+            if curl -fsS "${PROD_HEALTHCHECK_URL}" | grep -q '"status":"UP"'; then
+              echo "Production health check passed"
+              exit 0
+            fi
+
+            echo "Waiting for production health check... (${i}/30)"
+            sleep 5
+          done
+
+          echo "::error::Production health check failed."
+          exit 1

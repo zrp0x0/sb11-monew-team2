@@ -37,6 +37,7 @@ public class ArticleRestoreService {
       throw new BatchException(BatchErrorCode.INVALID_DATE_RANGE, Map.of("reason", "미래 날짜가 포함되었습니다."));
     }
 
+    log.info("기사 복구 파이프라인 시작 (요청 기간: {} ~ {})", from, to);
     List<ArticleRestoreResultResponse> restoreResultDtos = new ArrayList<>();
 
     LocalDate currentDate = from;
@@ -66,11 +67,11 @@ public class ArticleRestoreService {
               ArticleRestoreResultResponse.of(LocalDateTime.now(), restoredIds));
 
           isSuccess = true;
-          log.info("[{}] 기사 복구 성공 (복구 건수: {})", targetDateStr, restoredIds.size());
+          log.info("[{}] 기사 복구 완료 (복구 건수: {})", targetDateStr, restoredIds.size());
 
           break;
         } catch (JobExecutionException e) {
-          log.warn("[{}] 기사 복구 {}차 시도 실패: {}", targetDateStr, attempt, e.getMessage());
+          log.warn("[{}] 기사 복구 {}차 시도 실패 (원인: {}). 2초 후 재시도합니다...", targetDateStr, attempt, e.getMessage());
 
           if (attempt < MAX_RETRIES) {
             try {
@@ -83,10 +84,11 @@ public class ArticleRestoreService {
       }
 
       if (!isSuccess) {
-        log.error("[{}] 기사 복구 3회 시도 모두 실패. 다음 날짜로 건너뜁니다.", targetDateStr);
+        log.error("[{}] 기사 복구 3회 시도 초과로 실패. 다음 날짜로 건너뜁니다.", targetDateStr);
       }
       currentDate = currentDate.plusDays(1);
     }
+    log.info("기사 복구 파이프라인 종료 (총 {}일 치 처리 완료)", restoreResultDtos.size());
     return restoreResultDtos;
   }
 }

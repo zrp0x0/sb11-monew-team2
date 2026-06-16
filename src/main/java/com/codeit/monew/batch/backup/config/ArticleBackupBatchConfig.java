@@ -3,11 +3,14 @@ package com.codeit.monew.batch.backup.config;
 import com.amazonaws.services.s3.AmazonS3;
 import com.codeit.monew.batch.backup.dto.ArticleBackupDto;
 import com.codeit.monew.domain.article.entity.Article;
+import com.codeit.monew.domain.article.repository.ArticleInterestRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.persistence.EntityManagerFactory;
 import java.io.File;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.batch.core.ExitStatus;
@@ -39,6 +42,8 @@ public class ArticleBackupBatchConfig {
   private final EntityManagerFactory entityManagerFactory; // JPA로 DB를 읽기 위함
 
   private final AmazonS3 amazonS3;
+
+  private final ArticleInterestRepository articleInterestRepository;
 
   @Value("${batch.chunk-size:1000}")
   private int chunkSize; // 한 번에 DB에서 읽고 처리할 데이터의 양
@@ -75,7 +80,7 @@ public class ArticleBackupBatchConfig {
         .name("articleJpaReader")
         .entityManagerFactory(entityManagerFactory)
         .queryString(
-            "SELECT a FROM Article a WHERE FUNCTION('DATE', a.publishedAt) = CAST(:targetDate AS date) ORDER BY a.id ASC")
+            "SELECT a FROM Article a WHERE FUNCTION('DATE', a.createdAt) = CAST(:targetDate AS date) ORDER BY a.id ASC")
         .parameterValues(Map.of("targetDate", targetDate))
         .pageSize(chunkSize)
         .build();
@@ -83,14 +88,20 @@ public class ArticleBackupBatchConfig {
 
   @Bean
   public ItemProcessor<Article, ArticleBackupDto> articleProcessor() {
-    return article -> new ArticleBackupDto(
-        article.getId(),
-        article.getSource(),
-        article.getTitle(),
-        article.getSummary(),
-        article.getSourceUrl(),
-        article.getPublishedAt()
-    );
+    return article ->  {
+      List<UUID> interestIds = articleInterestRepository.findInterestIdsByArticleId(article.getId());
+
+      return new ArticleBackupDto(
+          article.getId(),
+          article.getSource(),
+          article.getTitle(),
+          article.getSummary(),
+          article.getSourceUrl(),
+          article.getPublishedAt(),
+          article.getCreatedAt(),
+          interestIds
+      );
+    };
   }
 
   @Bean

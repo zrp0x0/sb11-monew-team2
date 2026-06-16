@@ -3,11 +3,14 @@ package com.codeit.monew.domain.subscription.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.codeit.monew.domain.interest.entity.Interest;
+import com.codeit.monew.domain.interest.repository.InterestRepository;
 import com.codeit.monew.domain.subscription.entity.Subscription;
 import com.codeit.monew.domain.user.entity.User;
+import com.codeit.monew.domain.user.repository.UserRepository;
 import com.codeit.monew.global.config.JpaAuditingConfig;
 import com.codeit.monew.global.config.QuerydslConfig;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,12 @@ public class SubscriptionRepositoryTest {
 
   @Autowired
   private SubscriptionRepository subscriptionRepository;
+
+  @Autowired
+  private InterestRepository interestRepository;
+
+  @Autowired
+  private UserRepository userRepository;
 
   @Autowired
   private TestEntityManager tem;
@@ -55,8 +64,7 @@ public class SubscriptionRepositoryTest {
     List<UUID> interestIds = List.of(interestA.getId(), interestB.getId());
 
     //when
-    List<UUID> result = subscriptionRepository.findSubscribedInterestIds(user.getId(), interestIds);
-
+    Set<UUID> result = subscriptionRepository.findSubscribedInterestIds(user.getId(), interestIds);
     //then
     assertThat(result).hasSize(2)
         .containsExactlyInAnyOrder(interestA.getId(), interestB.getId())
@@ -79,7 +87,7 @@ public class SubscriptionRepositoryTest {
     List<UUID> interestIds = List.of(interestA.getId());
 
     //when
-    List<UUID> result = subscriptionRepository.findSubscribedInterestIds(user.getId(), interestIds);
+    Set<UUID> result = subscriptionRepository.findSubscribedInterestIds(user.getId(), interestIds);
 
     //then
     assertThat(result).isEmpty();
@@ -116,5 +124,41 @@ public class SubscriptionRepositoryTest {
         .extracting(Subscription::getId)
         .containsExactly(subscriptionB.getId())
         .doesNotContain(subscriptionA.getId());
+  }
+
+  @Test
+  @DisplayName("특정 유저와 관심사 ID로 매핑된 구독 데이터를 삭제하고 1을 반환한다.")
+  void deleteByInterestIdAndUserId_Success() {
+    // given
+    Interest interest = interestRepository.save(Interest.create("관심사", List.of("키워드")));
+    User user = userRepository.save(User.create("test@test.com", "유저", "pass"));
+    subscriptionRepository.save(Subscription.create(interest, user));
+
+    tem.flush(); tem.clear();
+
+    // when
+    int deletedCount = subscriptionRepository.deleteByInterestIdAndUserId(interest.getId(), user.getId());
+
+    // then
+    assertThat(deletedCount).isEqualTo(1);
+    boolean exists = subscriptionRepository.findByInterestIdAndUserId(interest.getId(), user.getId()).isPresent();
+    assertThat(exists).isFalse();
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 구독 데이터를 삭제하려 하면 0을 반환한다.")
+  void deleteByInterestIdAndUserId_Return_Zero() {
+    // given
+    Interest interest = interestRepository.save(Interest.create("관심사", List.of("키워드")));
+    User user = userRepository.save(User.create("test@test.com", "유저", "pass"));
+    // 구독(Subscription) 데이터는 생성하지 않음
+
+    tem.flush(); tem.clear();
+
+    // when
+    int deletedCount = subscriptionRepository.deleteByInterestIdAndUserId(interest.getId(), user.getId());
+
+    // then
+    assertThat(deletedCount).isEqualTo(0);
   }
 }
