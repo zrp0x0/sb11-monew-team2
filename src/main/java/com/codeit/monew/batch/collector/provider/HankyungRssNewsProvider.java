@@ -38,11 +38,11 @@ public class HankyungRssNewsProvider implements NewsProvider {
     private volatile Instant cachedAt = Instant.EPOCH;
 
     @Override
-    public List<CollectedNewsDto> fetchNews(Interest interest) {
+    public NewsFetchResult fetchNews(Interest interest) {
         List<String> keywords = interest.getKeywords();
 
         if (keywords == null || keywords.isEmpty()) {
-            return Collections.emptyList();
+            return NewsFetchResult.skipped(getSource(), "No keywords");
         }
 
         List<String> normalizedKeywords = keywords.stream()
@@ -51,11 +51,15 @@ public class HankyungRssNewsProvider implements NewsProvider {
                 .toList();
 
         if (normalizedKeywords.isEmpty()) {
-            return Collections.emptyList();
+            return NewsFetchResult.skipped(getSource(), "No valid keywords");
         }
 
         try {
             List<HankyungRssItem> rssItems = getCachedRssItems();
+            if (rssItems.isEmpty()) {
+                log.warn("[news-collector] 한국경제 RSS 응답이 비어 있습니다. interestId={}", interest.getId());
+                return NewsFetchResult.empty(getSource(), "Empty RSS response");
+            }
 
             List<CollectedNewsDto> collectedNews = rssItems.stream()
                     .map(item -> toCollectedNews(item, interest, normalizedKeywords))
@@ -70,7 +74,11 @@ public class HankyungRssNewsProvider implements NewsProvider {
                     collectedNews.size()
             );
 
-            return collectedNews;
+            if (collectedNews.isEmpty()) {
+                return NewsFetchResult.empty(getSource(), "No matched RSS items");
+            }
+
+            return NewsFetchResult.success(getSource(), collectedNews);
         } catch (Exception e) {
             log.error(
                     "[news-collector] 한국경제 RSS 뉴스 수집 중 예외가 발생했습니다. interestId={}, errorMessage={}",
@@ -78,7 +86,7 @@ public class HankyungRssNewsProvider implements NewsProvider {
                     e.getMessage(),
                     e
             );
-            return Collections.emptyList();
+            return NewsFetchResult.failed(getSource(), e.getMessage());
         }
     }
 

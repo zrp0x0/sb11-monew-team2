@@ -44,12 +44,14 @@ class HankyungRssNewsProviderTest {
                 .thenReturn(Collections.emptyList());
 
         // when
-        List<CollectedNewsDto> firstResult = provider.fetchNews(interest);
-        List<CollectedNewsDto> secondResult = provider.fetchNews(interest);
+        NewsFetchResult firstResult = provider.fetchNews(interest);
+        NewsFetchResult secondResult = provider.fetchNews(interest);
 
         // then
-        assertThat(firstResult).isEmpty();
-        assertThat(secondResult).isEmpty();
+        assertThat(firstResult.status()).isEqualTo(NewsFetchStatus.EMPTY_RESPONSE);
+        assertThat(firstResult.items()).isEmpty();
+        assertThat(secondResult.status()).isEqualTo(NewsFetchStatus.EMPTY_RESPONSE);
+        assertThat(secondResult.items()).isEmpty();
         verify(hankyungRssClient, times(1)).fetchRssXml();
         verify(hankyungRssParser, times(1)).parse("<rss><channel></channel></rss>");
     }
@@ -80,11 +82,12 @@ class HankyungRssNewsProviderTest {
         when(hankyungRssParser.parse("rss-xml")).thenReturn(List.of(matchedItem, unmatchedItem));
 
         // when
-        List<CollectedNewsDto> result = provider.fetchNews(interest);
+        NewsFetchResult result = provider.fetchNews(interest);
 
         // then
-        assertThat(result).hasSize(1);
-        CollectedNewsDto news = result.get(0);
+        assertThat(result.status()).isEqualTo(NewsFetchStatus.SUCCESS);
+        assertThat(result.items()).hasSize(1);
+        CollectedNewsDto news = result.items().get(0);
         assertThat(news.source()).isEqualTo(ArticleSource.HANKYUNG);
         assertThat(news.sourceUrl()).isEqualTo("https://www.hankyung.com/article/2026061000011?foo=bar");
         assertThat(news.title()).isEqualTo("AI 투자 & 전략");

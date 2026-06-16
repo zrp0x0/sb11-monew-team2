@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.codeit.monew.P1MonewApplication;
 import com.codeit.monew.batch.backup.scheduler.ArticleBackupScheduler;
 import com.codeit.monew.batch.collector.service.NewsCollectorService;
 import com.codeit.monew.batch.delete.CommentHardDeleteBatchJob;
+import com.codeit.monew.global.monitoring.service.MonewMetrics;
 import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Instant;
@@ -16,7 +18,9 @@ import java.time.ZoneId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -71,6 +75,9 @@ class SchedulingConfigurationTest {
   void articleBackupSchedulerUsesKstTargetDate() throws Exception {
     JobLauncher jobLauncher = mock(JobLauncher.class);
     Job articleBackupJob = mock(Job.class);
+    MonewMetrics monewMetrics = mock(MonewMetrics.class);
+    JobExecution jobExecution = new JobExecution(1L);
+    jobExecution.setStatus(BatchStatus.COMPLETED);
     Clock fixedKstClock = Clock.fixed(
         Instant.parse("2026-06-05T18:00:00Z"),
         ZoneId.of("Asia/Seoul")
@@ -78,8 +85,11 @@ class SchedulingConfigurationTest {
     ArticleBackupScheduler scheduler = new ArticleBackupScheduler(
         jobLauncher,
         articleBackupJob,
-        fixedKstClock
+        fixedKstClock,
+        monewMetrics
     );
+    when(jobLauncher.run(eq(articleBackupJob), org.mockito.ArgumentMatchers.any(JobParameters.class)))
+        .thenReturn(jobExecution);
 
     scheduler.runArticleBackupJob();
 
